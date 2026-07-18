@@ -230,6 +230,10 @@ static struct editorConfig {
 	/*	Position Stack		*/
 	int *posStack;
 	int posTop;
+
+	/*	Modes		*/
+	int readOnly;
+	int noColor;
 } E;
 
 static struct editorConfig E;
@@ -692,7 +696,7 @@ editorUpdateRow(erow *row)
 
 	y = row - E.row;
 
-	if (E.keywords)
+	if (E.keywords && !E.noColor)
 		renderKeywords(row);
 
 	if (E.mode == MODE_VISUAL)
@@ -1807,9 +1811,11 @@ commandMode(void)
 	} else if (!strcmp(cmd, "q!")) {
 		exit(0);
 	} else if (isCmd(cmd, "w")) {
+		if (E.readOnly) { promptMessage("Read only"); goto end; }
 		commandWriteFile(cmd);
 		goto end;
 	} else if (!strcmp(cmd, "wq")) {
+		if (E.readOnly) { promptMessage("Read only"); goto end; }
 		if (E.version && editorSave()) {
 			promptMessage("Cannot save file");
 			goto end;
@@ -2135,6 +2141,7 @@ processKeyNormal(int fd, int key)
 
 	switch (key) {
 	case 'd':
+		if (E.readOnly) { promptMessage("Read only"); break; }
 		key = editorReadKey(fd);
 		if (key == 'd') {
 			editorStartChange(y, y);
@@ -2178,6 +2185,7 @@ processKeyNormal(int fd, int key)
 		E.cx = 0;
 		break;
 	case 'o':
+		if (E.readOnly) { promptMessage("Read only"); break; }
 		editorStartChange(y + 1, y);
 		editorInsertRow(y + 1, UCL(""), 0);
 		enterInsertMode(y + 1);
@@ -2187,10 +2195,12 @@ processKeyNormal(int fd, int key)
 		editorCommitChange(y + 1, y + 1);
 		break;
 	case 'a':
+		if (E.readOnly) { promptMessage("Read only"); break; }
 		enterInsertMode(y);
 		editorMoveCursor(ARROW_RIGHT);
 		break;
 	case 'i':
+		if (E.readOnly) { promptMessage("Read only"); break; }
 		enterInsertMode(y);
 		break;
 	case 'v':
@@ -2235,6 +2245,7 @@ processKeyNormal(int fd, int key)
 		editorMoveCursorTo(E.numrows - 1, 0);
 		break;
 	case 'x':
+		if (E.readOnly) { promptMessage("Read only"); break; }
 		if (E.row[y].size) {
 			editorStartChange(y, y);
 			editorRowDelChar(E.row + y, E.cx);
@@ -2245,6 +2256,7 @@ processKeyNormal(int fd, int key)
 		}
 		break;
 	case 'r':
+		if (E.readOnly) { promptMessage("Read only"); break; }
 		key = editorReadKey(fd);
 		editorReplaceChar(y, E.cx, readWideChar(key));
 		break;
@@ -2252,6 +2264,7 @@ processKeyNormal(int fd, int key)
 		commandMode();
 		break;
 	case 'p':
+		if (E.readOnly) { promptMessage("Read only"); break; }
 		if (E.copyBuffer) {
 			editorStartChange(y, y - 1);
 			editorPaste(E.copyBuffer);
@@ -2303,6 +2316,14 @@ processKeyInsert(int fd, int key)
 {
 	int y = E.rowoff + E.cy;
 	(void)fd;
+	if (E.readOnly && key != ESC && key != ARROW_LEFT &&
+	    key != ARROW_RIGHT && key != ARROW_UP && key != ARROW_DOWN &&
+	    key != HOME_KEY && key != END_KEY &&
+	    key != CTRL_ARROW_LEFT && key != CTRL_ARROW_RIGHT &&
+	    key != PAGE_UP && key != PAGE_DOWN) {
+		promptMessage("Read only");
+		return;
+	}
 	switch (key) {
 	case ESC:
 		editorMoveCursor(ARROW_LEFT);
@@ -2464,6 +2485,7 @@ processKeyVisual(int fd, int key)
 		break;
 	case 'x':
 	case 'd':	/*	Cut	*/
+		if (E.readOnly) { promptMessage("Read only"); break; }
 		free(E.copyBuffer);
 
 		editorStartChange(sy, ey);
@@ -2586,8 +2608,11 @@ usage(const char *prog)
 {
 	fprintf(stderr, "Usage: %s [options] <filename>\n", prog);
 	fprintf(stderr, "Options:\n");
-	fprintf(stderr, "  --help     Show this help message\n");
-	fprintf(stderr, "  --version  Show version information\n");
+	fprintf(stderr, "  --help         Show this help message\n");
+	fprintf(stderr, "  --version      Show version information\n");
+	fprintf(stderr, "  --no-color     Disable syntax highlighting\n");
+	fprintf(stderr, "  --read-only    Open file in read-only mode\n");
+	fprintf(stderr, "  -R             Same as --read-only\n");
 	return;
 }
 
@@ -2608,6 +2633,7 @@ int
 main(int argc, const char *argv[])
 {
 	int i;
+	const char *filename = NULL;
 
 	for (i = 1; i < argc; i++) {
 		if (!strcmp(argv[i], "--version")) {
@@ -2618,16 +2644,40 @@ main(int argc, const char *argv[])
 			usage(argv[0]);
 			return 0;
 		}
+		if (!strcmp(argv[i], "--no-color")) {
+			E.noColor = 1;
+			continue;
+		}
+		if (!strcmp(argv[i], "--read-only") ||
+		    !strcmp(argv[i], "-R")) {
+			/* handled after initEditor */
+			continue;
+		}
+		/* Treat anything else as the filename */
+		filename = argv[i];
 	}
 
-	if (argc != 2) {
+	if (!filename) {
 		usage(argv[0]);
 		return -1;
 	}
 
+	/* Check for read-only flag */
+	for (i = 1; i < argc; i++) {
+		if (!strcmp(argv[i], "--read-only") ||
+		    !strcmp(argv[i], "-R")) {
+			/* set after initEditor */
+			break;
+		}
+	}
+
 	setlocale(LC_ALL, "");
 	initEditor();
-	editorOpen(argv[1]);
+
+	if (i < argc)
+		E.readOnly = 1;
+
+	editorOpen(filename);
 
 	/*	Make sure there is at last one row	*/
 	if (!E.numrows) {

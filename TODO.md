@@ -8,6 +8,5 @@
 # ucvim TODO List
 
  - Better code highlighting (Markdown, HTML, C, Shell Scripts, Lua)
- - Home and End key support
- - CTRL+{left, right} arrow support (skipping by word/underline (since this is coding oriented))
  - Add command line options (eg. --help, --version (maybe via getting the git revision at compile time), and --no-color (turns off highlighting)
+ - Add support for saving options in a file (eg. ~/.ucvimrc.ini on Unix/MSYS2, C:\Documents and Settings\$(USER)\ucvimrc.ini for Windows)

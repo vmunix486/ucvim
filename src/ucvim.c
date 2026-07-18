@@ -2376,8 +2376,20 @@ processKeyInsert(int fd, int key)
 	case END_KEY:
 		{
 			erow *r = E.row + E.rowoff + E.cy;
-			E.cx = r->size > 0 ? r->size - 1 : 0;
+			E.cx = r->size;
 		}
+		break;
+	case ARROW_LEFT:
+		editorMoveCursor(ARROW_LEFT);
+		break;
+	case ARROW_RIGHT:
+		editorMoveCursor(ARROW_RIGHT);
+		break;
+	case ARROW_UP:
+		editorMoveCursor(ARROW_UP);
+		break;
+	case ARROW_DOWN:
+		editorMoveCursor(ARROW_DOWN);
 		break;
 	case CTRL_ARROW_LEFT:
 		wordLeft();

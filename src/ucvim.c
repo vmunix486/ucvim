@@ -261,7 +261,9 @@ enum KEY_ACTION {
 	HOME_KEY,
 	END_KEY,
 	PAGE_UP,
-	PAGE_DOWN
+	PAGE_DOWN,
+	CTRL_ARROW_LEFT,
+	CTRL_ARROW_RIGHT
 };
 
 /* ======================= Low level terminal handling ====================== */
@@ -416,6 +418,17 @@ editorReadKey(int fd) {
 						case '3': return DEL_KEY;
 						case '5': return PAGE_UP;
 						case '6': return PAGE_DOWN;
+						}
+					} else if (seq[2] == ';') {
+						/* Ctrl+Arrow: ESC [ 1 ; 5 C/D */
+						char extra[2];
+						if (read(fd, extra, 1) == 0) return ESC;
+						if (read(fd, extra+1, 1) == 0) return ESC;
+						if (extra[0] == '5') {
+							if (extra[1] == 'C')
+								return CTRL_ARROW_RIGHT;
+							if (extra[1] == 'D')
+								return CTRL_ARROW_LEFT;
 						}
 					}
 				} else {
@@ -1954,6 +1967,82 @@ scrollLines(int direction, int count)
 	return;
 }
 
+static int
+isWordChar(ucchar c)
+{
+	return uc_isalnum(c) || c == UCC('_') || c == UCC('-');
+}
+
+static void
+wordLeft(void)
+{
+	erow *row;
+	int filerow;
+
+	if (E.cx == 0) {
+		/* Move to end of previous line */
+		filerow = E.rowoff + E.cy;
+		if (filerow > 0) {
+			E.cy--;
+			if (E.cy < 0) {
+				E.rowoff--;
+				E.cy = 0;
+			}
+			row = E.row + E.rowoff + E.cy;
+			E.cx = row->size > 0 ? row->size - 1 : 0;
+		}
+		return;
+	}
+
+	row = E.row + E.rowoff + E.cy;
+	/* Skip current word characters */
+	while (E.cx > 0 && isWordChar(row->chars[E.cx - 1]))
+		E.cx--;
+	/* Skip whitespace */
+	while (E.cx > 0 && uc_isspace(row->chars[E.cx - 1]))
+		E.cx--;
+	/* Skip non-word, non-space characters (operators, etc.) */
+	while (E.cx > 0 && !isWordChar(row->chars[E.cx - 1]) &&
+	       !uc_isspace(row->chars[E.cx - 1]))
+		E.cx--;
+}
+
+static void
+wordRight(void)
+{
+	erow *row;
+	int filerow;
+	int size;
+
+	filerow = E.rowoff + E.cy;
+	row = E.row + filerow;
+	size = row->size;
+
+	if (E.cx >= size - 1) {
+		/* Move to start of next line */
+		if (filerow < E.numrows - 1) {
+			E.cy++;
+			if (E.cy > E.rowBottom) {
+				E.rowoff++;
+				E.cy = E.rowBottom;
+			}
+			E.cx = 0;
+		}
+		return;
+	}
+
+	/* Skip current word characters */
+	while (E.cx < size && isWordChar(row->chars[E.cx]))
+		E.cx++;
+	/* Skip whitespace */
+	while (E.cx < size && uc_isspace(row->chars[E.cx]))
+		E.cx++;
+	/* Skip non-word, non-space characters */
+	while (E.cx < size && !isWordChar(row->chars[E.cx]) &&
+	       !uc_isspace(row->chars[E.cx]))
+		E.cx++;
+}
+
 char *
 getKeywordUnderCursor(void)
 {
@@ -2117,6 +2206,12 @@ processKeyNormal(int fd, int key)
 	case ARROW_UP:
 		editorMoveCursor(ARROW_UP);
 		break;
+	case CTRL_ARROW_LEFT:
+		wordLeft();
+		break;
+	case CTRL_ARROW_RIGHT:
+		wordRight();
+		break;
 	case 'g':
 		key = editorReadKey(fd);
 		if (key == 'g') {
@@ -2213,6 +2308,21 @@ processKeyInsert(int fd, int key)
 	case BACKSPACE:
 		editorDelChar();
 		break;
+	case HOME_KEY:
+		E.cx = 0;
+		break;
+	case END_KEY:
+		{
+			erow *r = E.row + E.rowoff + E.cy;
+			E.cx = r->size > 0 ? r->size - 1 : 0;
+		}
+		break;
+	case CTRL_ARROW_LEFT:
+		wordLeft();
+		break;
+	case CTRL_ARROW_RIGHT:
+		wordRight();
+		break;
 	case PAGE_UP:
 		scrollLines(ARROW_UP, E.screenrows);
 		break;
@@ -2306,6 +2416,14 @@ processKeyVisual(int fd, int key)
 	case ARROW_UP:
 		editorMoveCursor(ARROW_UP);
 		editorUpdateRange(E.rowoff + E.cy, y);
+		break;
+	case CTRL_ARROW_LEFT:
+		wordLeft();
+		editorUpdateRange(E.rowoff + E.cy, y);
+		break;
+	case CTRL_ARROW_RIGHT:
+		wordRight();
+		editorUpdateRange(y, E.rowoff + E.cy);
 		break;
 	case 'g':
 		key = editorReadKey(fd);

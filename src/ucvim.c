@@ -1077,6 +1077,36 @@ editorOpen(const char *filename)
 	return 0;
 }
 
+static void
+editorLoadStdin(void)
+{
+	char *line = NULL;
+	size_t linecap = 0;
+	int linelen;
+	int ttyfd;
+
+	E.version = 0;
+	free(E.filename);
+	E.filename = strdup("[stdin]");
+
+	while ((linelen = getline(&line, &linecap, stdin)) != -1) {
+		if (linelen && (line[linelen - 1] == '\n' ||
+		    line[linelen - 1] == '\r'))
+			line[--linelen] = '\0';
+		editorInsertRowMb(E.numrows, line);
+	}
+	free(line);
+
+	/* Redirect stdin to the terminal for keyboard input */
+	ttyfd = open("/dev/tty", O_RDONLY);
+	if (ttyfd != -1) {
+		dup2(ttyfd, STDIN_FILENO);
+		close(ttyfd);
+	}
+
+	E.version = 0;
+}
+
 /* Save the current file on disk. Return 0 on success, 1 on error. */
 int
 editorSave(void) {
@@ -2607,12 +2637,14 @@ static void
 usage(const char *prog)
 {
 	fprintf(stderr, "Usage: %s [options] <filename>\n", prog);
+	fprintf(stderr, "       %s [options] -\n", prog);
 	fprintf(stderr, "Options:\n");
 	fprintf(stderr, "  --help         Show this help message\n");
 	fprintf(stderr, "  --version      Show version information\n");
 	fprintf(stderr, "  --no-color     Disable syntax highlighting\n");
 	fprintf(stderr, "  --read-only    Open file in read-only mode\n");
 	fprintf(stderr, "  -R             Same as --read-only\n");
+	fprintf(stderr, "  -              Read from standard input\n");
 	return;
 }
 
@@ -2677,7 +2709,10 @@ main(int argc, const char *argv[])
 	if (i < argc)
 		E.readOnly = 1;
 
-	editorOpen(filename);
+	if (!strcmp(filename, "-"))
+		editorLoadStdin();
+	else
+		editorOpen(filename);
 
 	/*	Make sure there is at last one row	*/
 	if (!E.numrows) {

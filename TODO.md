@@ -9,4 +9,5 @@
 
  - Better code highlighting (Markdown, HTML, C, Shell Scripts, Lua)
  - Add support for saving options in a file (eg. ~/.ucvimrc.ini on Unix/MSYS2, C:\Documents and Settings\$(USER)\ucvimrc.ini for Windows)
- - Add support for loading from stdin (like `glxinfo | vim -` for example)
+ - Fix moving the cursor while in insert mode
+ - Fix support on Windows XP MSYS2

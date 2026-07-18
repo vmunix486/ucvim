@@ -415,7 +415,9 @@ editorReadKey(int fd) {
 					if (read(fd, seq+2, 1) == 0) return ESC;
 					if (seq[2] == '~') {
 						switch(seq[1]) {
+						case '1': return HOME_KEY;
 						case '3': return DEL_KEY;
+						case '4': return END_KEY;
 						case '5': return PAGE_UP;
 						case '6': return PAGE_DOWN;
 						}
@@ -430,6 +432,13 @@ editorReadKey(int fd) {
 							if (extra[1] == 'D')
 								return CTRL_ARROW_LEFT;
 						}
+					}
+					/* Consume any trailing bytes of unknown
+					 * extended sequences to avoid blocking. */
+					{
+						char junk;
+						while (read(fd, &junk, 1) == 1 &&
+						       junk >= '0' && junk <= '~');
 					}
 				} else {
 					switch(seq[1]) {

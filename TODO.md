@@ -10,3 +10,4 @@
  - Better code highlighting (Markdown, HTML, C, Shell Scripts, Lua)
  - Add support for saving options in a file (eg. ~/.ucvimrc.ini on Unix/MSYS2, C:\Documents and Settings\$(USER)\ucvimrc.ini for Windows)
  - Fix support on Windows XP MSYS2
+ - Add teminal restorement (like normal vim)

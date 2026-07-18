@@ -61,6 +61,7 @@
 #include<signal.h>
 
 #include"ucvim.conf.h"
+#include"version.h"
 
 #if defined(__STDC_VERSION__) && __STDC_VERSION__ >= 199901L
 #define INLINE static inline
@@ -2583,13 +2584,42 @@ initEditor(void)
 static void
 usage(const char *prog)
 {
-	fprintf(stderr, "Usage: %s <filename>\n", prog);
+	fprintf(stderr, "Usage: %s [options] <filename>\n", prog);
+	fprintf(stderr, "Options:\n");
+	fprintf(stderr, "  --help     Show this help message\n");
+	fprintf(stderr, "  --version  Show version information\n");
+	return;
+}
+
+static void
+showVersion(void)
+{
+	printf("ucvim %s", UCVIM_VERSION);
+#ifdef WCHAR_ENABLED
+	printf(" (wchar)");
+#else
+	printf(" (no wchar)");
+#endif
+	printf("\n");
 	return;
 }
 
 int
 main(int argc, const char *argv[])
 {
+	int i;
+
+	for (i = 1; i < argc; i++) {
+		if (!strcmp(argv[i], "--version")) {
+			showVersion();
+			return 0;
+		}
+		if (!strcmp(argv[i], "--help")) {
+			usage(argv[0]);
+			return 0;
+		}
+	}
+
 	if (argc != 2) {
 		usage(argv[0]);
 		return -1;

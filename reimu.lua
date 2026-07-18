@@ -64,7 +64,7 @@ end
 
 local function clean()
 	if flags.clean == true then
-		os.execute("rm -rfv nob build/ nob.c nob.h compile.sh src/ucvim")
+		os.execute("rm -rfv nob build/ nob.c nob.h compile.sh src/ucvim src/version.h")
 		os.exit(0)
 	end
 end
@@ -113,6 +113,16 @@ local function ifexists()
 	local test1p = io.open("test1", "r")
 	if test1p then
 		os.remove("test1")
+	end
+
+	local versionh = io.open("src/version.h", "r")
+	if versionh then
+		os.remove("src/version.h")
+	end
+
+	local srcucvim = io.open("src/ucvim", "r")
+	if srcucvim then
+		os.remove("src/ucvim")
 	end
 end
 
@@ -347,7 +357,7 @@ local function finishnob()
 	-- This is the special mojo sauce line
 	-- Get all the sauce you need!
 	if wide == true then
-		io.write('	nob_cmd_append(&cmd, "' .. compiler .. '", "-D_WCHAR", ' .. tcflags .. ', "-o", BUILD_FOLDER"ucvim", SRC_FOLDER"ucvim.c");\n')
+		io.write('	nob_cmd_append(&cmd, "' .. compiler .. '", "-D_WCHAR", "-DWCHAR_ENABLED", ' .. tcflags .. ', "-o", BUILD_FOLDER"ucvim", SRC_FOLDER"ucvim.c");\n')
 	else
 		io.write('	nob_cmd_append(&cmd, "' .. compiler .. '", ' .. tcflags .. ', "-o", BUILD_FOLDER"ucvim", SRC_FOLDER"ucvim.c");\n')
 	end
@@ -357,6 +367,18 @@ local function finishnob()
 	io.write("}\n")
 
         io.close(nob)
+end
+
+local function version()
+	print("Getting the git revision...")
+	local versionh = io.open("src/version.h", "w")
+	io.output(versionh)
+	io.write("#define UCVIM_VERSION ")
+	local command = assert(io.popen("git describe --always --dirty=-git 2>/dev/null"))
+	local output = command:read("*l")
+	command:close()
+	io.write('"' ..  output .. '"')
+	io.close(versionh)
 end
 
 local function shscript()
@@ -403,6 +425,7 @@ local function main()
 	testcompiler()
 	tcflags()
 	finishnob()
+	version()
 	shscript()
 	compile()
 end

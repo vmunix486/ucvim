@@ -18,6 +18,7 @@ struct Ucvim_Conf {
 	int highlightKeywordColor;
 	int autoIndent;
 	int positionStackSize;
+	int showLineNumbers;
 } C = {
 	8,		/* tabsize */
 	64 * 1024,	/* outputBufferSize */
@@ -26,6 +27,7 @@ struct Ucvim_Conf {
 	2,		/* highlightKeywordColor */
 	1,		/* autoIndent */
 	16,		/* positionStackSize */
+	1,		/* showLineNumbers */
 };
 
 /*
@@ -40,6 +42,7 @@ Ucvim_Conf_Entry gConfList[] = {
 	ENTRY(highlightTrailingSpace),
 	ENTRY(highlightKeywordColor),
 	ENTRY(autoIndent),
+	ENTRY(showLineNumbers),
 };
 
 #undef ENTRY

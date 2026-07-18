@@ -1139,11 +1139,12 @@ switchAttr(Char_Attr *old, Char_Attr *new_attr)
 }
 
 INLINE int
-drawRowAt(int at, int remainSpace, int doWrite)
+drawRowAt(int at, int remainSpace, int doWrite, int gutter)
 {
 	erow *row = E.row + at;
 	int line = 0;
 	int i, width, t;
+	int avail;
 	Char_Attr lastAttr;
 
 	lastAttr.unused = 1;
@@ -1153,6 +1154,17 @@ drawRowAt(int at, int remainSpace, int doWrite)
 	lastAttr.reverse = 0;
 	lastAttr.color = 0;
 
+	avail = E.screencols - gutter;
+
+	/*	Print line number gutter on first line	*/
+	if (doWrite && gutter > 0) {
+		char numbuf[16];
+		int numwidth = gutter - 1;
+		if (numwidth < 1) numwidth = 1;
+		snprintf(numbuf, sizeof(numbuf), "%*d ", numwidth, at + 1);
+		writeString(numbuf);
+	}
+
 	for (i = 0, width = 0; i < row->size; i++) {
 		t = uc_wcwidth(row->chars[i]);
 		/* Normal characters, TAB or control charaters */
@@ -1161,10 +1173,14 @@ drawRowAt(int at, int remainSpace, int doWrite)
 					   1;
 
 		/*	Wrapping	*/
-		if (width + t > E.screencols) {
+		if (width + t > avail) {
 			width = 0;
-			if (doWrite)
+			if (doWrite) {
+				int g;
 				writeString("\x1b[0K\r\n");
+				for (g = 0; g < gutter; g++)
+					putchar(' ');
+			}
 			line++;
 			if (line >= remainSpace)
 				return 0;
@@ -1206,6 +1222,17 @@ editorRefreshScreen(int doWrite)
 	erow *row;
 	char status[80], rstatus[80];
 	int len, rlen;
+	int gutter = 0;
+
+	/*	Compute line number gutter width	*/
+	if (C.showLineNumbers) {
+		int n;
+		gutter = 0;
+		n = E.numrows > 0 ? E.numrows : 1;
+		while (n > 0) { gutter++; n /= 10; }
+		if (gutter < 2) gutter = 2;
+		gutter += 1; /* separator space */
+	}
 
 	writeString("\x1b[?25l");	/* Hide cursor. */
 	writeString("\x1b[H");		/* Go home. */
@@ -1220,25 +1247,39 @@ editorRefreshScreen(int doWrite)
 				continue;
 			if (!E.numrows && printedLine == E.screenrows / 2) {
 				char welcome[80];
-				int wellen = snprintf(welcome, sizeof(welcome),
-						      "ucvim\x1b[0K\r\n");
-				int padding = (E.screencols - wellen) / 2;
+				int wellen;
+				int available = E.screencols - gutter;
+				int padding;
+				int g;
+				if (doWrite && gutter > 0) {
+					for (g = 0; g < gutter; g++)
+						putchar(' ');
+				}
+				wellen = snprintf(welcome, sizeof(welcome),
+					      "ucvim");
+				padding = (available - wellen) / 2;
 				if (padding) {
 					putchar('~');
 					padding--;
 				}
 				while(padding--)
 					putchar(' ');
-
 				writeString(welcome);
+				writeString("\x1b[0K\r\n");
 			} else {
+				int g;
+				if (doWrite && gutter > 0) {
+					for (g = 0; g < gutter; g++)
+						putchar(' ');
+				}
 				writeString("~\x1b[0K\r\n");
 			}
 			printedLine = 1;
 			continue;
 		}
 
-		printedLine = drawRowAt(filerow, E.screenrows - y, doWrite);
+		printedLine = drawRowAt(filerow, E.screenrows - y, doWrite,
+					gutter);
 
 		if (!printedLine)
 			break;
@@ -1271,13 +1312,14 @@ editorRefreshScreen(int doWrite)
 	if (row) {
 		for (i = 0; i < E.cx && i < row->size; i++) {
 			int width = uc_wcwidth(row->chars[i]);
+			int avail = E.screencols - gutter;
 			width = width >= 0		? width		:
 			        row->chars[i] == TAB	? t - cx % t	:
 							  1;
-			cursorY += cx + width < E.screencols ? 0 : 1;
-			cx = cx + width < E.screencols	? cx + width	:
+			cursorY += cx + width < avail ? 0 : 1;
+			cx = cx + width < avail	? cx + width	:
 			     row->chars[i] == TAB	? cx + width -
-							  E.screencols	:
+							  avail	:
 							  0;
 		}
 	}
@@ -1303,7 +1345,7 @@ editorRefreshScreen(int doWrite)
 		}
 	}
 
-	printf("\x1b[%d;%dH", cursorY + 1, cx + 1);
+	printf("\x1b[%d;%dH", cursorY + 1, cx + gutter + 1);
 	writeString("\x1b[?25h");		/* Show cursor */
 	fflush(stdout);				/* stdout is block-buffered */
 	return;
@@ -2129,6 +2171,12 @@ processKeyNormal(int fd, int key)
 	case CTRL_U:
 		scrollLines(ARROW_UP, E.screenrows / 2);
 		break;
+	case PAGE_UP:
+		scrollLines(ARROW_UP, E.screenrows);
+		break;
+	case PAGE_DOWN:
+		scrollLines(ARROW_DOWN, E.screenrows);
+		break;
 	case CTRL_Z:
 		exitRawMode('\0');
 		raise(SIGSTOP);
@@ -2164,6 +2212,12 @@ processKeyInsert(int fd, int key)
 	case CTRL_BACKSPACE:
 	case BACKSPACE:
 		editorDelChar();
+		break;
+	case PAGE_UP:
+		scrollLines(ARROW_UP, E.screenrows);
+		break;
+	case PAGE_DOWN:
+		scrollLines(ARROW_DOWN, E.screenrows);
 		break;
 	default:
 		editorInsertChar(readWideChar(key));
@@ -2301,6 +2355,14 @@ processKeyVisual(int fd, int key)
 	case CTRL_U:
 		scrollLines(ARROW_UP, E.screenrows / 2);
 		editorUpdateRange(E.rowoff + E.cy, y);
+		break;
+	case PAGE_UP:
+		scrollLines(ARROW_UP, E.screenrows);
+		editorUpdateRange(E.rowoff + E.cy, y);
+		break;
+	case PAGE_DOWN:
+		scrollLines(ARROW_DOWN, E.screenrows);
+		editorUpdateRange(y, E.rowoff + E.cy);
 		break;
 	case ':':
 		commandMode();

@@ -64,7 +64,7 @@ end
 
 local function clean()
 	if flags.clean == true then
-		os.execute("rm -rfv nob build/ nob.c nob.h compile.sh")
+		os.execute("rm -rfv nob build/ nob.c nob.h compile.sh src/ucvim")
 		os.exit(0)
 	end
 end

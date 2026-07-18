@@ -209,6 +209,64 @@ local function detectcompiler()
 	print("\27[31mIf you just do not have a C compiler... Womp Womp.\27[0m")
 end
 
+local function detectheaders(header)
+	local file = io.open("/usr/include/" .. header, "r")
+	if file then
+		print(header .. " found.")
+		io.close(file)
+	else
+		print(header .. " NOT found.")
+		print(header .. " is needed for compilation.")
+		-- io.close(file)
+		os.exit(1)
+	end
+end
+
+local function headers()
+	detectheaders("assert.h")
+	detectheaders("stdlib.h")
+	detectheaders("stdio.h")
+	detectheaders("errno.h")
+	detectheaders("string.h")
+	detectheaders("ctype.h")
+	detectheaders("time.h")
+	-- detectheaders("stdarg.h")
+	detectheaders("locale.h")
+	detectheaders("limits.h")
+	detectheaders("termios.h")
+	detectheaders("sys/types.h")
+	detectheaders("sys/ioctl.h")
+	detectheaders("sys/time.h")
+	detectheaders("sys/wait.h")
+	detectheaders("unistd.h")
+	detectheaders("fcntl.h")
+	detectheaders("signal.h")
+
+	local wchar = io.open("/usr/include/wchar.h", "r")
+	if wchar then
+		print("wchar.h found.")
+		wide = true
+		io.close(wchar)
+	else
+		print("wchar.h NOT found.")
+		print("It is not nessisary for compilation.")
+		wide = false
+		io.close(wchar)
+	end
+
+	local wctype = io.open("/usr/include/wctype.h", "r")
+	if wctype then
+		print("wctype.h found.")
+		wide = true
+		io.close(wctype)
+	else
+		print("wctype.h NOT found.")
+		print("It is not nessisary for compilation.")
+		wide = false
+		io.close(wctype)
+	end
+end
+
 local function testcompiler()
 	print("Testing " .. compiler  .. "...")
 	
@@ -288,7 +346,11 @@ local function finishnob()
 
 	-- This is the special mojo sauce line
 	-- Get all the sauce you need!
-	io.write('	nob_cmd_append(&cmd, "' .. compiler .. '", ' .. tcflags .. ', "-o", BUILD_FOLDER"ucvim", SRC_FOLDER"ucvim.c");\n')
+	if wide == true then
+		io.write('	nob_cmd_append(&cmd, "' .. compiler .. '", "-D_WCHAR", ' .. tcflags .. ', "-o", BUILD_FOLDER"ucvim", SRC_FOLDER"ucvim.c");\n')
+	else
+		io.write('	nob_cmd_append(&cmd, "' .. compiler .. '", ' .. tcflags .. ', "-o", BUILD_FOLDER"ucvim", SRC_FOLDER"ucvim.c");\n')
+	end
 	io.write("	if (!nob_cmd_run(&cmd)) return 1;\n")
 	io.write("	return 0;\n")
 
@@ -337,6 +399,7 @@ local function main()
 	detectdownloader()
 	download()
 	detectcompiler()
+	headers()
 	testcompiler()
 	tcflags()
 	finishnob()

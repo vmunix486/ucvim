@@ -9,4 +9,6 @@
 # ucvim TODO List
 
  - Better code highlighting
- - Page Down and Up
+ - Page Down and Up support
+ - Home and End key support
+ - CTRL+{left, right} arrow support (skipping by word/underline (since this is coding oriented))

@@ -10,3 +10,4 @@
  - Better code highlighting (Markdown, HTML, C, Shell Scripts, Lua)
  - Add command line options (eg. --help, --version (maybe via getting the git revision at compile time), and --no-color (turns off highlighting)
  - Add support for saving options in a file (eg. ~/.ucvimrc.ini on Unix/MSYS2, C:\Documents and Settings\$(USER)\ucvimrc.ini for Windows)
+ - Add support for loading from stdin (like `glxinfo | vim -` for example)

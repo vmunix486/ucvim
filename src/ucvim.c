@@ -1761,7 +1761,7 @@ promptGetline(char prompt)
 	buf = malloc(sizeof(char) * size);
 	c = (char)editorReadKey(STDIN_FILENO);
 	for (; c != ENTER; c = (char)editorReadKey(STDIN_FILENO)) {
-		if (c == BACKSPACE) {
+		if (c == BACKSPACE || c == CTRL_BACKSPACE) {
 			if (!i)
 				continue;
 			printf("\b \b");
@@ -1977,6 +1977,13 @@ commandWriteFile(const char *cmd)
 	return;
 }
 
+static void
+strLower(char *s)
+{
+	for (; *s; s++)
+		*s = (char)tolower((unsigned char)*s);
+}
+
 INLINE void
 commandMode(void)
 {
@@ -1995,6 +2002,20 @@ commandMode(void)
 	 */
 	if (!*cmd)
 		goto end;
+
+	/* Lowercase the command word for case-insensitive matching
+	 * (e.g. :Wq, :WQ, :Q! all work like :wq, :wq, :q!) */
+	{
+		char *space = cmd;
+		while (*space && !isspace((unsigned char)*space))
+			space++;
+		{
+			char saved = *space;
+			*space = '\0';
+			strLower(cmd);
+			*space = saved;
+		}
+	}
 
 	/* Shell command: !command */
 	if (*cmd == '!') {

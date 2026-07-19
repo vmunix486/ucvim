@@ -11,4 +11,4 @@
  - More color
  - Add support for saving options in a file (eg. ~/.ucvimrc.ini on Unix/MSYS2, C:\Documents and Settings\$(USER)\ucvimrc.ini for Windows)
  - Make the default color depth 256
- - Add support for uppercase saving commands (:Wq, :WQ, :Q!, :Q, :W. For people that are fast with vim)
+

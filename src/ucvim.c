@@ -404,25 +404,27 @@ int
 editorReadKey(int fd) {
 	int nread;
 	char c, seq[3];
-	while ((nread = read(fd, &c, 1)) == 0);
+	(void)fd;
+	while ((nread = read(STDIN_FILENO, &c, 1)) == 0);
 	if (nread == -1) {
-		if (errno == EINTR)
-			return ESC;
-		exit(1);
+		/* read() can fail on platforms where raw mode doesn't
+		 * work properly (e.g. MSYS2/Windows). Don't die;
+		 * just return ESC so the editor keeps running. */
+		return ESC;
 	}
 
 	while(1) {
 		switch(c) {
 		case ESC:    /* escape sequence */
 			/* If this is just an ESC, we'll timeout here. */
-			if (read(fd, seq, 1) <= 0) return ESC;
-			if (read(fd, seq+1, 1) <= 0) return ESC;
+			if (read(STDIN_FILENO, seq, 1) <= 0) return ESC;
+			if (read(STDIN_FILENO, seq+1, 1) <= 0) return ESC;
 
 			/* ESC [ sequences. */
 			if (seq[0] == '[') {
 				if (seq[1] >= '0' && seq[1] <= '9') {
 					/* Extended escape, read additional byte. */
-					if (read(fd, seq+2, 1) <= 0) return ESC;
+					if (read(STDIN_FILENO, seq+2, 1) <= 0) return ESC;
 					if (seq[2] == '~') {
 						switch(seq[1]) {
 						case '1': return HOME_KEY;
@@ -434,8 +436,8 @@ editorReadKey(int fd) {
 					} else if (seq[2] == ';') {
 						/* Ctrl+Arrow: ESC [ 1 ; 5 C/D */
 						char extra[2];
-						if (read(fd, extra, 1) <= 0) return ESC;
-						if (read(fd, extra+1, 1) <= 0) return ESC;
+						if (read(STDIN_FILENO, extra, 1) <= 0) return ESC;
+						if (read(STDIN_FILENO, extra+1, 1) <= 0) return ESC;
 						if (extra[0] == '5') {
 							if (extra[1] == 'C')
 								return CTRL_ARROW_RIGHT;
@@ -447,7 +449,7 @@ editorReadKey(int fd) {
 					 * extended sequences to avoid blocking. */
 					{
 						char junk;
-						while (read(fd, &junk, 1) == 1 &&
+						while (read(STDIN_FILENO, &junk, 1) == 1 &&
 						       junk >= '0' && junk <= '~');
 					}
 				} else {

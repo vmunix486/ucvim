@@ -1992,6 +1992,23 @@ commandMode(void)
 	if (!*cmd)
 		goto end;
 
+	/* Shell command: !command */
+	if (*cmd == '!') {
+		int ttyfd;
+		char c;
+		exitRawMode('\0');
+		system(cmd + 1);
+		printf("\r\nPress Enter to continue...");
+		fflush(stdout);
+		ttyfd = open("/dev/tty", O_RDONLY);
+		if (ttyfd != -1) {
+			read(ttyfd, &c, 1);
+			close(ttyfd);
+		}
+		enableRawMode();
+		goto end;
+	}
+
 	offset = 0;
 	if (!strcmp(cmd, "q")) {
 		if (E.version) {
@@ -2454,6 +2471,29 @@ processKeyNormal(int fd, int key)
 		break;
 	case ':':
 		commandMode();
+		break;
+	case '!':
+		{
+			char *shcmd;
+			int ttyfd;
+			char c;
+			shcmd = promptGetline('!');
+			if (!*shcmd) {
+				free(shcmd);
+				break;
+			}
+			exitRawMode('\0');
+			system(shcmd);
+			printf("\r\nPress Enter to continue...");
+			fflush(stdout);
+			ttyfd = open("/dev/tty", O_RDONLY);
+			if (ttyfd != -1) {
+				read(ttyfd, &c, 1);
+				close(ttyfd);
+			}
+			free(shcmd);
+			enableRawMode();
+		}
 		break;
 	case 'p':
 		if (E.readOnly) { promptMessage("Read only"); break; }

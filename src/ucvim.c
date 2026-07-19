@@ -2361,6 +2361,13 @@ editorRefreshScreen(int doWrite)
 		}
 	}
 
+	/* If cursor is off-screen due to line wrapping, scroll down */
+	if (doWrite && cursorY >= E.screenrows) {
+		E.rowoff += cursorY - E.screenrows + 1;
+		editorRefreshScreen(true);
+		return;
+	}
+
 	printf("\x1b[%d;%dH", cursorY + 1, cx + gutter + 1);
 	writeString("\x1b[?25h");		/* Show cursor */
 	fflush(stdout);				/* stdout is block-buffered */

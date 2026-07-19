@@ -16,11 +16,11 @@
  - `:l` - load - loads a file, makes a new one if it doesn't exist. Prompts the user if they want to save the current file or not.
  - Color newlines (\n) in purple (like vim)
  - `:!i command` runs the system command given and writes the output of it into the current text file at the cursor location
- - If you scroll down a lot with Page Up or Page Down, it sometimes highlights the top line of the screenfull of characters.
- - Fix Delete key not working
- - Bug: If you are on the bottom line on a screenful of text, and you type until the text wraps around, instead of scrolling the screen down, it puts the cursor at the top, making you need to scroll up and down again.
+ - Scrolling a lot up and down causes the top line of the text to be highlighted in the terminal's default background hightlight color. Unrelated to opening and closing brackets, parenthesis, and curly brackets. (I use Konsole as my default terminal. Selecting text in Konsole causes it to make the background color text white, just like the bug at the top of ucvim.)
  - Add support for deleting by word with CTRL+Backspace and CTRL+Delete
- - Fix bug where the cursor and the text can become disconnected from eachother, causing the cursor to be 1 line down and 1 character forward from where the text should actually be. Probably a problem retaining to handling text wrapping.
+ - Fix bug where the cursor and the text can become disconnected from eachother, causing the cursor to be 1 line down and sometimes 1 character forward from where the text should actually be. Probably a problem retaining to handling text wrapping. Or something else. It sometimes happens when you open the editor, and change terminal sizes within the editor, so it might be handlining terminal size incorrectly, and thinking the cursor is in the correct place, when the actual cursor rendered by the terminal is in someplace else. Maybe sync the terminal cursor location with the editor cursor location.
+ - Sometimes the gutter just... doesn't show up? (like while editing this)
+ - When typing a line that wraps around on the last rendered line, it creates a new line that does not wrap around (makes a literal new line, and doesn't keep it on the same line)
  
  
 ## Performance

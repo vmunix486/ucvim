@@ -192,6 +192,7 @@ typedef struct {
 	unsigned int underline	: 1;	/* [4m */
 	unsigned int reverse	: 1;	/* [7m */
 	unsigned int color	: 8;	/* ANSI color 0-255 */
+	unsigned int bg		: 8;	/* ANSI bg color 0-255 (0=default) */
 } Char_Attr;
 
 typedef enum {
@@ -264,6 +265,10 @@ static struct editorConfig {
 	int readOnly;
 	int noColor;
 	int colorDepth;
+
+	/*	Bracket Match		*/
+	int hasMatch;
+	int matchRow, matchCol;
 } E;
 
 static struct editorConfig E;
@@ -1422,6 +1427,7 @@ editorUpdateRow(erow *row)
 		row->attr[i].underline = 0;
 		row->attr[i].reverse = 0;
 		row->attr[i].color = COLOR_WHITE;
+		row->attr[i].bg = 0;
 	}
 
 	y = row - E.row;
@@ -1936,12 +1942,36 @@ writeAttrColor(int color)
 	}
 }
 
+static void
+writeBgColor(int color)
+{
+	if (color == 0) {
+		/* Default background */
+		writeString("\x1b[49m");
+		return;
+	}
+	if (E.colorDepth <= 8) {
+		printf("\x1b[4%um", (unsigned int)(color & 7));
+	} else if (E.colorDepth <= 16) {
+		if (color < 8)
+			printf("\x1b[4%um", (unsigned int)color);
+		else
+			printf("\x1b[%um", (unsigned int)(100 + color - 8));
+	} else {
+		printf("\x1b[48;5;%um", (unsigned int)color);
+	}
+}
+
 void
 switchAttr(Char_Attr *old, Char_Attr *new_attr)
 {
 	if (old->color != new_attr->color)
 		writeAttrColor(new_attr->color);
 	old->color = new_attr->color;
+
+	if (old->bg != new_attr->bg)
+		writeBgColor(new_attr->bg);
+	old->bg = new_attr->bg;
 
 	if (old->bold != new_attr->bold ||
 	    old->italic != new_attr->italic ||
@@ -1957,7 +1987,109 @@ switchAttr(Char_Attr *old, Char_Attr *new_attr)
 		if (new_attr->reverse)
 			writeString("\x1b[7m");
 		writeAttrColor(new_attr->color);
+		writeBgColor(new_attr->bg);
 	}
+}
+
+/* Bracket match pair finding */
+static int isBracket(ucchar c)
+{
+	return c == UCC('(') || c == UCC(')') ||
+	       c == UCC('[') || c == UCC(']') ||
+	       c == UCC('{') || c == UCC('}');
+}
+
+static ucchar matchChar(ucchar c)
+{
+	if (c == UCC('(')) return UCC(')');
+	if (c == UCC(')')) return UCC('(');
+	if (c == UCC('[')) return UCC(']');
+	if (c == UCC(']')) return UCC('[');
+	if (c == UCC('{')) return UCC('}');
+	if (c == UCC('}')) return UCC('{');
+	return 0;
+}
+
+/* Find matching bracket. Returns 1 if found, sets *matchRow and *matchCol. */
+static int findMatchPair(int curRow, int curCol, int *matchRow, int *matchCol)
+{
+	ucchar c, target;
+	int depth, r, dir;
+	erow *row;
+
+	if (curRow < 0 || curRow >= E.numrows) return 0;
+	row = &E.row[curRow];
+	if (curCol < 0 || curCol >= row->size) return 0;
+
+	c = row->chars[curCol];
+	if (!isBracket(c)) return 0;
+
+	target = matchChar(c);
+	depth = 1;
+	dir = (c == UCC('(') || c == UCC('[') || c == UCC('{')) ? 1 : -1;
+
+	/* Search in current row */
+	r = curRow;
+	if (dir > 0) {
+		int ci;
+		for (ci = curCol + 1; ci < row->size; ci++) {
+			if (row->chars[ci] == c) depth++;
+			if (row->chars[ci] == target) {
+				depth--;
+				if (depth == 0) {
+					*matchRow = r;
+					*matchCol = ci;
+					return 1;
+				}
+			}
+		}
+	} else {
+		int ci;
+		for (ci = curCol - 1; ci >= 0; ci--) {
+			if (row->chars[ci] == c) depth++;
+			if (row->chars[ci] == target) {
+				depth--;
+				if (depth == 0) {
+					*matchRow = r;
+					*matchCol = ci;
+					return 1;
+				}
+			}
+		}
+	}
+
+	/* Search other rows */
+	for (r = curRow + dir; r >= 0 && r < E.numrows; r += dir) {
+		row = &E.row[r];
+		if (dir > 0) {
+			int ci;
+			for (ci = 0; ci < row->size; ci++) {
+				if (row->chars[ci] == c) depth++;
+				if (row->chars[ci] == target) {
+					depth--;
+					if (depth == 0) {
+						*matchRow = r;
+						*matchCol = ci;
+						return 1;
+					}
+				}
+			}
+		} else {
+			int ci;
+			for (ci = row->size - 1; ci >= 0; ci--) {
+				if (row->chars[ci] == c) depth++;
+				if (row->chars[ci] == target) {
+					depth--;
+					if (depth == 0) {
+						*matchRow = r;
+						*matchCol = ci;
+						return 1;
+					}
+				}
+			}
+		}
+	}
+	return 0;
 }
 
 INLINE int
@@ -2017,6 +2149,17 @@ drawRowAt(int at, int remainSpace, int doWrite, int gutter)
 			switchAttr(&lastAttr, row->attr + i);
 			lastAttr = row->attr[i];
 		}
+		/* Bracket match: apply light blue background */
+		if (E.hasMatch && !E.noColor) {
+			int isCursorBracket = (at == E.rowoff + E.cy && i == E.cx);
+			int isMatchBracket = (at == E.matchRow && i == E.matchCol);
+			if ((isCursorBracket || isMatchBracket) && lastAttr.bg != COLOR_BRIGHT_CYAN) {
+				Char_Attr hlAttr = lastAttr;
+				hlAttr.bg = COLOR_BRIGHT_CYAN;
+				switchAttr(&lastAttr, &hlAttr);
+				lastAttr = hlAttr;
+			}
+		}
 		if (doWrite) {
 			if (row->chars[i] == TAB) {
 				/*	Handle TABs	*/
@@ -2063,6 +2206,27 @@ editorRefreshScreen(int doWrite)
 
 	writeString("\x1b[?25l");	/* Hide cursor. */
 	writeString("\x1b[H");		/* Go home. */
+
+	/* Find bracket match pair for highlighting */
+	{
+		int matchRow = -1, matchCol = -1;
+		int curFilerow = E.rowoff + E.cy;
+		if (curFilerow < E.numrows) {
+			erow *crow = &E.row[curFilerow];
+			if (E.cx < crow->size &&
+			    findMatchPair(curFilerow, E.cx,
+					  &matchRow, &matchCol)) {
+				/* Override attr on both positions */
+				E.matchRow = matchRow;
+				E.matchCol = matchCol;
+				E.hasMatch = 1;
+			} else {
+				E.hasMatch = 0;
+			}
+		} else {
+			E.hasMatch = 0;
+		}
+	}
 
 	E.isScreenFull = true;
 	for (i = 0; y < E.screenrows; y += printedLine, i++) {

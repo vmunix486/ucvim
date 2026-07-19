@@ -734,7 +734,7 @@ renderKeywords(erow *row, erow *prev)
 		}
 	}
 
-	/* Detect function definitions: "function name(" */
+	/* Detect function definitions: "function name(params)" */
 	{
 		ucchar *fp;
 		for (fp = row->chars; fp < row->chars + row->size - 1; fp++) {
@@ -764,6 +764,48 @@ renderKeywords(erow *row, erow *prev)
 						E.funcNames[idx][nl] = UCC('\0');
 						E.numFuncNames = idx + 1;
 						E.funcNames[idx + 1] = NULL;
+					}
+					/* Extract parameters: function name(p1, p2, ...) */
+					while (fp < row->chars + row->size && *fp == UCC(' '))
+						fp++;
+					if (fp < row->chars + row->size && *fp == UCC('(')) {
+						fp++; /* skip '(' */
+						while (fp < row->chars + row->size && *fp != UCC(')')) {
+							ucchar *ps, *pe;
+							int pl;
+							while (fp < row->chars + row->size && (*fp == UCC(' ') || *fp == UCC(',')))
+								fp++;
+							if (*fp == UCC(')'))
+								break;
+							ps = fp;
+							while (fp < row->chars + row->size &&
+							       (uc_isalnum(*fp) || *fp == UCC('_')))
+								fp++;
+							pe = fp;
+							pl = (int)(pe - ps);
+							if (pl > 0) {
+								int vidx = E.numVarNames;
+								int already = 0;
+								int vi;
+								for (vi = 0; vi < E.numVarNames; vi++) {
+									if (uc_strlen(E.varNames[vi]) == (size_t)pl &&
+									    uc_strncmp(E.varNames[vi], ps, pl) == 0) {
+										already = 1;
+										break;
+									}
+								}
+								if (!already) {
+									E.varNames = realloc(E.varNames,
+										sizeof(kwtype) * (vidx + 2));
+									E.varNames[vidx] = malloc(
+										sizeof(ucchar) * (pl + 1));
+									uc_strncpy(E.varNames[vidx], ps, pl);
+									E.varNames[vidx][pl] = UCC('\0');
+									E.numVarNames = vidx + 1;
+									E.varNames[vidx + 1] = NULL;
+								}
+							}
+						}
 					}
 				}
 			}

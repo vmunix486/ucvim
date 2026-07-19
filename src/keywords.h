@@ -6,6 +6,7 @@
 /* Language IDs for lang-specific highlighting rules */
 #define L_DEFAULT 0
 #define L_LUA 1
+#define L_HTML 2
 
 /* Default keyword color for most languages */
 #define KC COLOR_BRIGHT_MAGENTA
@@ -195,25 +196,11 @@ kwtype __m4KeywordsRaw[] = {
 static Keyword __m4Keywords[sizeof(__m4KeywordsRaw)/sizeof(__m4KeywordsRaw[0])];
 
 kwtype __htmlKeywordsRaw[] = {
-	UCL("html"), UCL("head"), UCL("body"), UCL("title"), UCL("meta"),
-	UCL("link"), UCL("script"), UCL("style"), UCL("div"), UCL("span"),
-	UCL("p"), UCL("br"), UCL("hr"), UCL("img"), UCL("a"),
-	UCL("h1"), UCL("h2"), UCL("h3"), UCL("h4"), UCL("h5"), UCL("h6"),
-	UCL("ul"), UCL("ol"), UCL("li"), UCL("table"), UCL("tr"),
-	UCL("td"), UCL("th"), UCL("thead"), UCL("tbody"), UCL("tfoot"),
-	UCL("form"), UCL("input"), UCL("button"), UCL("select"),
-	UCL("option"), UCL("textarea"), UCL("label"),
-	UCL("header"), UCL("footer"), UCL("nav"), UCL("main"),
-	UCL("section"), UCL("article"), UCL("aside"),
-	UCL("strong"), UCL("em"), UCL("b"), UCL("i"), UCL("u"),
-	UCL("pre"), UCL("code"), UCL("blockquote"),
-	UCL("video"), UCL("audio"), UCL("source"), UCL("canvas"),
-	UCL("svg"), UCL("iframe"),
 	UCL("class"), UCL("id"), UCL("href"), UCL("src"),
 	UCL("alt"), UCL("title"), UCL("type"), UCL("name"),
 	UCL("value"), UCL("placeholder"), UCL("disabled"),
 	UCL("required"), UCL("checked"), UCL("selected"),
-	UCL("style"), UCL("onclick"), UCL("onload"),
+	UCL("onclick"), UCL("onload"),
 	NULL
 };
 static Keyword __htmlKeywords[sizeof(__htmlKeywordsRaw)/sizeof(__htmlKeywordsRaw[0])];
@@ -340,8 +327,8 @@ Keyword_Class K[] = {
 	{ ".hs", L_DEFAULT, __haskellKeywords },
 	{ ".m4", L_DEFAULT, __m4Keywords },
 	{ ".ac", L_DEFAULT, __m4Keywords },
-	{ ".html", L_DEFAULT, __htmlKeywords },
-	{ ".htm", L_DEFAULT, __htmlKeywords },
+	{ ".html", L_HTML, __htmlKeywords },
+	{ ".htm", L_HTML, __htmlKeywords },
 	{ ".md", L_DEFAULT, __markdownKeywords },
 	{ ".markdown", L_DEFAULT, __markdownKeywords },
 	{ NULL, 0, NULL },

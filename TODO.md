@@ -7,8 +7,8 @@
 
 # ucvim TODO List
 
- - Better code highlighting (Markdown, HTML, C, Shell Scripts, Lua) (There is code highlighting but it needs to be better)
+ - Better code highlighting (Markdown, HTML, C, Shell Scripts)
  - Add support for saving options in a file (eg. ~/.ucvimrc.ini on Unix/MSYS2, C:\Documents and Settings\$(USER)\ucvimrc.ini for Windows)
- - Make the default color depth 256
  - Test support on older operating systems and gcc versions
  - Make source code much more readable (with lots of code comments)
+ - Add highlighting of closed brackets/parenthesis/single+double quotes/curly brackets. (like vim)

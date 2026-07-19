@@ -195,7 +195,7 @@ typedef struct {
 } Char_Attr;
 
 typedef enum {
-	HL_NONE = 0, HL_IN_COMMENT
+	HL_NONE = 0, HL_IN_COMMENT, HL_IN_HTML_COMMENT, HL_IN_A_TAG
 } HighlightState;
 
 /* This structure represents a single line of the file we are editing. */
@@ -924,6 +924,54 @@ renderKeywords(erow *row, erow *prev)
 			continue;
 		}
 
+		/* Inside HTML comment */
+		if (inString == 0 && row->hlState == HL_IN_HTML_COMMENT) {
+			row->attr[i].color = COLOR_BRIGHT_CYAN;
+			if (prevChar == UCC('-') && *p == UCC('-') &&
+			    (p + 1) < end && *(p+1) == UCC('>')) {
+				row->attr[i].color = COLOR_BRIGHT_CYAN;
+				row->attr[i + 1].color = COLOR_BRIGHT_CYAN;
+				i++;
+				p++;
+				row->hlState = HL_NONE;
+			}
+			prevChar = *p;
+			continue;
+		}
+
+		/* Inside <a> tag text - highlight in blue */
+		if (row->hlState == HL_IN_A_TAG) {
+			/* Look for </a> to end */
+			if (*p == UCC('<') && (p + 1) < end && *(p+1) == UCC('/')) {
+				const ucchar *cp = p + 2;
+				int ci = i + 2;
+				if (cp < end && *cp == UCC('a')) {
+					/* Color </a> magenta */
+					row->attr[i].color = COLOR_BRIGHT_MAGENTA;
+					row->attr[i + 1].color = COLOR_BRIGHT_MAGENTA;
+					row->attr[i + 2].color = COLOR_BRIGHT_MAGENTA;
+					cp++; ci++;
+					/* Color attributes/space in closing tag magenta, > magenta */
+					while (cp < end && *cp != UCC('>')) {
+						row->attr[ci].color = COLOR_BRIGHT_MAGENTA;
+						cp++; ci++;
+					}
+					if (cp < end) {
+						row->attr[ci].color = COLOR_BRIGHT_MAGENTA;
+						p = (ucchar *)cp; i = ci;
+					}
+					row->hlState = HL_NONE;
+				}
+				prevChar = *p;
+				continue;
+			}
+			if (*p != UCC('<')) {
+				row->attr[i].color = COLOR_BRIGHT_BLUE;
+				prevChar = *p;
+				continue;
+			}
+		}
+
 		/* Inside string */
 		if (inString) {
 			row->attr[i].color = COLOR_BRIGHT_YELLOW;
@@ -957,12 +1005,102 @@ renderKeywords(erow *row, erow *prev)
 			continue;
 		}
 
-		/* String start */
-		if (*p == UCC('"') || *p == UCC('\'')) {
+		/* String start (HTML only uses ", not ') */
+		if (*p == UCC('"') ||
+		    (E.lang != L_HTML && *p == UCC('\''))) {
 			inString = *p;
 			row->attr[i].color = COLOR_BRIGHT_YELLOW;
 			prevChar = *p;
 			continue;
+		}
+
+		/* <!DOCTYPE ...> - bright blue */
+		if (*p == UCC('<') && (p + 1) < end && *(p+1) == UCC('!')) {
+			const ucchar *doctype_check = p + 2;
+			const ucchar *doctype_lit = UCC("doctype");
+			int dk;
+			int is_doctype = 1;
+			for (dk = 0; dk < 7; dk++) {
+				ucchar ch = doctype_check < end ? *doctype_check : 0;
+				ucchar lit_ch = *(doctype_lit + dk);
+				if (ch >= UCC('A') && ch <= UCC('Z'))
+					ch = ch + (UCC('a') - UCC('A'));
+				if (ch != lit_ch) { is_doctype = 0; break; }
+				doctype_check++;
+			}
+			if (is_doctype) {
+				/* Color entire <!DOCTYPE ...> line bright blue */
+				for (j = i; j < row->size; j++)
+					row->attr[j].color = COLOR_BRIGHT_BLUE;
+				prevChar = *p;
+				return;
+			}
+		}
+
+		/* General HTML tag detection: <tag> and </tag> */
+		if (*p == UCC('<') && E.lang == L_HTML && row->hlState != HL_IN_A_TAG) {
+			const ucchar *tagStart = p + 1;
+			int tagIdx = i + 1;
+			int isClosing = 0;
+			const ucchar *tp;
+			int ti;
+
+			/* Check for closing tag </ */
+			if (tagStart < end && *tagStart == UCC('/')) {
+				isClosing = 1;
+				row->attr[i].color = COLOR_BRIGHT_MAGENTA;
+				row->attr[tagIdx].color = COLOR_BRIGHT_MAGENTA;
+				tagStart++;
+				tagIdx++;
+			}
+
+			/* Check if next char is a letter (valid tag name start) */
+			if (tagStart < end && uc_isalpha(*tagStart)) {
+				int isATag = 0;
+				int inQuote = 0;
+
+				/* Check if this is an <a> tag */
+				if (!isClosing && *tagStart == UCC('a') &&
+				    ((tagStart + 1) >= end || !uc_isalpha(*(tagStart + 1))))
+				{
+					isATag = 1;
+				}
+
+				/* Color < or </ */
+				if (!isClosing)
+					row->attr[i].color = COLOR_BRIGHT_MAGENTA;
+				/* Color tag name */
+				tp = tagStart;
+				ti = tagIdx;
+				while (tp < end && (uc_isalnum(*tp) || *tp == UCC('-'))) {
+					row->attr[ti].color = COLOR_BRIGHT_MAGENTA;
+					tp++; ti++;
+				}
+				/* Color attributes and > */
+				while (tp < end) {
+					if (*tp == UCC('"') || *tp == UCC('\'')) {
+						row->attr[ti].color = COLOR_BRIGHT_YELLOW;
+						inQuote = !inQuote;
+					} else if (inQuote) {
+						row->attr[ti].color = COLOR_BRIGHT_YELLOW;
+					} else {
+						row->attr[ti].color = COLOR_BRIGHT_MAGENTA;
+					}
+					if (*tp == UCC('>')) {
+						if (isATag)
+							row->hlState = HL_IN_A_TAG;
+						break;
+					}
+					tp++; ti++;
+				}
+				/* Advance p and i to after > */
+				if (tp < end) {
+					p = (ucchar *)tp;
+					i = ti;
+				}
+				prevChar = *p;
+				continue;
+			}
 		}
 
 		/* Keyword match */

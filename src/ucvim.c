@@ -734,8 +734,8 @@ renderKeywords(erow *row, erow *prev)
 		}
 	}
 
-	/* Detect function definitions: "function name(params)" */
-	{
+	/* Detect function definitions: "function name(params)" (Lua only) */
+	if (E.lang == L_LUA) {
 		ucchar *fp;
 		for (fp = row->chars; fp < row->chars + row->size - 1; fp++) {
 			if (fp == row->chars ||
@@ -1001,6 +1001,7 @@ renderKeywords(erow *row, erow *prev)
 		if (*p == UCC('/') && (p + 1) < end && *(p+1) == UCC('*')) {
 			row->attr[i].color = COLOR_BRIGHT_CYAN;
 			inComment = 1;
+			row->hlState = HL_IN_COMMENT;
 			prevChar = *p;
 			continue;
 		}
@@ -1114,6 +1115,8 @@ renderKeywords(erow *row, erow *prev)
 			}
 			/* Try each keyword */
 			for (keyword = E.keywords; keyword->word; keyword++) {
+				if (*p != keyword->word[0])
+					continue;
 				len = uc_strlen(keyword->word);
 				if (uc_strncmp(p, keyword->word, len) == 0) {
 					ucchar *next = p + len;

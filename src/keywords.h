@@ -11,40 +11,123 @@
 /* Default keyword color for most languages */
 #define KC COLOR_BRIGHT_MAGENTA
 
-kwtype __cKeywordsRaw[] = {
-	UCL("int"), UCL("long"), UCL("short"), UCL("char"), UCL("void"),
-	UCL("float"), UCL("double"), UCL("unsigned"), UCL("signed"),
-	UCL("bool"), UCL("_Bool"), UCL("size_t"), UCL("ssize_t"),
-	UCL("wchar_t"), UCL("FILE"), UCL("NULL"),
-	UCL("const"), UCL("volatile"), UCL("static"), UCL("extern"),
-	UCL("auto"), UCL("register"), UCL("inline"), UCL("restrict"),
-	UCL("if"), UCL("else"), UCL("for"), UCL("while"), UCL("do"),
-	UCL("switch"), UCL("case"), UCL("default"), UCL("break"),
-	UCL("continue"), UCL("return"), UCL("goto"),
-	UCL("struct"), UCL("union"), UCL("enum"), UCL("typedef"),
-	UCL("sizeof"), UCL("typeof"), UCL("asm"),
-	UCL("printf"), UCL("fprintf"), UCL("sprintf"), UCL("snprintf"),
-	UCL("scanf"), UCL("fscanf"), UCL("sscanf"),
-	UCL("malloc"), UCL("calloc"), UCL("realloc"), UCL("free"),
-	UCL("memcpy"), UCL("memset"), UCL("memmove"), UCL("memcmp"),
-	UCL("strlen"), UCL("strcpy"), UCL("strncpy"), UCL("strcat"),
-	UCL("strcmp"), UCL("strncmp"), UCL("strchr"), UCL("strrchr"),
-	UCL("strstr"), UCL("strdup"),
-	UCL("fopen"), UCL("fclose"), UCL("fread"), UCL("fwrite"),
-	UCL("fgets"), UCL("fputs"), UCL("feof"), UCL("ferror"),
-	UCL("fflush"), UCL("fseek"), UCL("ftell"), UCL("rewind"),
-	UCL("getchar"), UCL("putchar"), UCL("gets"), UCL("puts"),
-	UCL("exit"), UCL("abort"), UCL("atexit"),
-	UCL("atoi"), UCL("atof"), UCL("atol"),
-	UCL("strtol"), UCL("strtoul"), UCL("strtod"),
-	UCL("isalpha"), UCL("isdigit"), UCL("isalnum"), UCL("isspace"),
-	UCL("isupper"), UCL("islower"), UCL("toupper"), UCL("tolower"),
-	UCL("signal"), UCL("raise"),
-	UCL("true"), UCL("false"),
-	NULL
+kwtype __cKeywordsRaw[] = { 0 }; /* unused - see __cKeywords below */
+Keyword __cKeywords[] = {
+	/* Data types - bright green */
+	KW("int", COLOR_BRIGHT_GREEN),
+	KW("long", COLOR_BRIGHT_GREEN),
+	KW("short", COLOR_BRIGHT_GREEN),
+	KW("char", COLOR_BRIGHT_GREEN),
+	KW("void", COLOR_BRIGHT_GREEN),
+	KW("float", COLOR_BRIGHT_GREEN),
+	KW("double", COLOR_BRIGHT_GREEN),
+	KW("unsigned", COLOR_BRIGHT_GREEN),
+	KW("signed", COLOR_BRIGHT_GREEN),
+	KW("bool", COLOR_BRIGHT_GREEN),
+	KW("_Bool", COLOR_BRIGHT_GREEN),
+	KW("size_t", COLOR_BRIGHT_GREEN),
+	KW("ssize_t", COLOR_BRIGHT_GREEN),
+	KW("wchar_t", COLOR_BRIGHT_GREEN),
+	KW("FILE", COLOR_BRIGHT_GREEN),
+	KW("NULL", COLOR_BRIGHT_GREEN),
+	/* Type qualifiers - bright cyan */
+	KW("const", COLOR_BRIGHT_CYAN),
+	KW("volatile", COLOR_BRIGHT_CYAN),
+	KW("static", COLOR_BRIGHT_CYAN),
+	KW("extern", COLOR_BRIGHT_CYAN),
+	KW("auto", COLOR_BRIGHT_CYAN),
+	KW("register", COLOR_BRIGHT_CYAN),
+	KW("inline", COLOR_BRIGHT_CYAN),
+	KW("restrict", COLOR_BRIGHT_CYAN),
+	/* Control flow - bright magenta */
+	KW("if", COLOR_BRIGHT_MAGENTA),
+	KW("else", COLOR_BRIGHT_MAGENTA),
+	KW("for", COLOR_BRIGHT_MAGENTA),
+	KW("while", COLOR_BRIGHT_MAGENTA),
+	KW("do", COLOR_BRIGHT_MAGENTA),
+	KW("switch", COLOR_BRIGHT_MAGENTA),
+	KW("case", COLOR_BRIGHT_MAGENTA),
+	KW("default", COLOR_BRIGHT_MAGENTA),
+	KW("break", COLOR_BRIGHT_MAGENTA),
+	KW("continue", COLOR_BRIGHT_MAGENTA),
+	KW("return", COLOR_BRIGHT_MAGENTA),
+	KW("goto", COLOR_BRIGHT_MAGENTA),
+	/* Type constructors - bright cyan */
+	KW("struct", COLOR_BRIGHT_CYAN),
+	KW("union", COLOR_BRIGHT_CYAN),
+	KW("enum", COLOR_BRIGHT_CYAN),
+	KW("typedef", COLOR_BRIGHT_CYAN),
+	/* Operators - bright magenta */
+	KW("sizeof", COLOR_BRIGHT_MAGENTA),
+	KW("typeof", COLOR_BRIGHT_MAGENTA),
+	KW("asm", COLOR_BRIGHT_MAGENTA),
+	/* Stdlib functions - cyan */
+	KW("printf", COLOR_CYAN),
+	KW("fprintf", COLOR_CYAN),
+	KW("sprintf", COLOR_CYAN),
+	KW("snprintf", COLOR_CYAN),
+	KW("scanf", COLOR_CYAN),
+	KW("fscanf", COLOR_CYAN),
+	KW("sscanf", COLOR_CYAN),
+	KW("malloc", COLOR_CYAN),
+	KW("calloc", COLOR_CYAN),
+	KW("realloc", COLOR_CYAN),
+	KW("free", COLOR_CYAN),
+	KW("memcpy", COLOR_CYAN),
+	KW("memset", COLOR_CYAN),
+	KW("memmove", COLOR_CYAN),
+	KW("memcmp", COLOR_CYAN),
+	KW("strlen", COLOR_CYAN),
+	KW("strcpy", COLOR_CYAN),
+	KW("strncpy", COLOR_CYAN),
+	KW("strcat", COLOR_CYAN),
+	KW("strcmp", COLOR_CYAN),
+	KW("strncmp", COLOR_CYAN),
+	KW("strchr", COLOR_CYAN),
+	KW("strrchr", COLOR_CYAN),
+	KW("strstr", COLOR_CYAN),
+	KW("strdup", COLOR_CYAN),
+	KW("fopen", COLOR_CYAN),
+	KW("fclose", COLOR_CYAN),
+	KW("fread", COLOR_CYAN),
+	KW("fwrite", COLOR_CYAN),
+	KW("fgets", COLOR_CYAN),
+	KW("fputs", COLOR_CYAN),
+	KW("feof", COLOR_CYAN),
+	KW("ferror", COLOR_CYAN),
+	KW("fflush", COLOR_CYAN),
+	KW("fseek", COLOR_CYAN),
+	KW("ftell", COLOR_CYAN),
+	KW("rewind", COLOR_CYAN),
+	KW("getchar", COLOR_CYAN),
+	KW("putchar", COLOR_CYAN),
+	KW("gets", COLOR_CYAN),
+	KW("puts", COLOR_CYAN),
+	KW("exit", COLOR_CYAN),
+	KW("abort", COLOR_CYAN),
+	KW("atexit", COLOR_CYAN),
+	KW("atoi", COLOR_CYAN),
+	KW("atof", COLOR_CYAN),
+	KW("atol", COLOR_CYAN),
+	KW("strtol", COLOR_CYAN),
+	KW("strtoul", COLOR_CYAN),
+	KW("strtod", COLOR_CYAN),
+	KW("isalpha", COLOR_CYAN),
+	KW("isdigit", COLOR_CYAN),
+	KW("isalnum", COLOR_CYAN),
+	KW("isspace", COLOR_CYAN),
+	KW("isupper", COLOR_CYAN),
+	KW("islower", COLOR_CYAN),
+	KW("toupper", COLOR_CYAN),
+	KW("tolower", COLOR_CYAN),
+	KW("signal", COLOR_CYAN),
+	KW("raise", COLOR_CYAN),
+	/* Constants - green */
+	KW("true", COLOR_GREEN),
+	KW("false", COLOR_GREEN),
+	/* Sentinel */
+	{ NULL, 0 }
 };
-/* Auto-wrap raw kwtype array into Keyword array with default color */
-static Keyword __cKeywords[sizeof(__cKeywordsRaw)/sizeof(__cKeywordsRaw[0])];
 
 kwtype __luaKeywordsRaw[] = {
 	UCL("local"), UCL("return"), UCL("if"),
@@ -341,11 +424,6 @@ Keyword_Class K[] = {
 static void initKeywords(void)
 {
 	int i;
-	for (i = 0; __cKeywordsRaw[i]; i++) {
-		__cKeywords[i].word = __cKeywordsRaw[i];
-		__cKeywords[i].color = KC;
-	}
-	__cKeywords[i].word = NULL; __cKeywords[i].color = 0;
 
 	for (i = 0; __luaKeywordsRaw[i]; i++) {
 		__luaKeywords[i].word = __luaKeywordsRaw[i];

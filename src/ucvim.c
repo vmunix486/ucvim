@@ -1003,7 +1003,7 @@ renderKeywords(erow *row, erow *prev)
 						     *next != UCC('_'))) {
 							for (j = 0; j < (int)len; j++)
 								row->attr[i + j].color =
-									COLOR_BLUE;
+									COLOR_BRIGHT_GREEN;
 							p += len - 1;
 							i += len - 1;
 							break;
@@ -1046,7 +1046,7 @@ renderKeywords(erow *row, erow *prev)
 					    row->chars[j] == UCC('X') ||
 					    row->chars[j] == UCC('e') ||
 					    row->chars[j] == UCC('E'))
-						row->attr[j].color = COLOR_CYAN;
+						row->attr[j].color = COLOR_BRIGHT_BLUE;
 					else if (uc_isalpha(row->chars[j]) ||
 						 row->chars[j] == UCC('_'))
 						continue;
@@ -1746,7 +1746,7 @@ editorRefreshScreen(int doWrite)
 					      "ucvim");
 				padding = (available - wellen) / 2;
 				if (padding) {
-					writeString("\x1b[34m~\x1b[0m");
+					writeString("\x1b[90m~\x1b[0m");
 					padding--;
 				}
 				while(padding--)
@@ -1759,7 +1759,7 @@ editorRefreshScreen(int doWrite)
 					for (g = 0; g < gutter; g++)
 						putchar(' ');
 				}
-				writeString("\x1b[34m~\x1b[0m\x1b[0K\r\n");
+				writeString("\x1b[90m~\x1b[0m\x1b[0K\r\n");
 			}
 			printedLine = 1;
 			continue;

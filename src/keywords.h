@@ -8,7 +8,7 @@
 #define L_LUA 1
 
 /* Default keyword color for most languages */
-#define KC COLOR_BRIGHT_GREEN
+#define KC COLOR_BRIGHT_MAGENTA
 
 kwtype __cKeywordsRaw[] = {
 	UCL("int"), UCL("long"), UCL("short"), UCL("char"), UCL("void"),
@@ -228,32 +228,32 @@ static Keyword __markdownKeywords[sizeof(__markdownKeywordsRaw)/sizeof(__markdow
  *	Per-keyword color tables for Lua.
  */
 Keyword __luaKW[] = {
-	/* Control flow - bright green */
-	KW("local", COLOR_BRIGHT_GREEN),
-	KW("function", COLOR_BRIGHT_GREEN),
-	KW("return", COLOR_BRIGHT_GREEN),
-	KW("if", COLOR_BRIGHT_GREEN),
-	KW("then", COLOR_BRIGHT_GREEN),
-	KW("else", COLOR_BRIGHT_GREEN),
-	KW("elseif", COLOR_BRIGHT_GREEN),
-	KW("end", COLOR_BRIGHT_GREEN),
-	KW("for", COLOR_BRIGHT_GREEN),
-	KW("in", COLOR_BRIGHT_GREEN),
-	KW("do", COLOR_BRIGHT_GREEN),
-	KW("while", COLOR_BRIGHT_GREEN),
-	KW("repeat", COLOR_BRIGHT_GREEN),
-	KW("until", COLOR_BRIGHT_GREEN),
-	KW("break", COLOR_BRIGHT_GREEN),
-	KW("goto", COLOR_BRIGHT_GREEN),
+	/* Control flow - bright magenta */
+	KW("local", COLOR_BRIGHT_MAGENTA),
+	KW("function", COLOR_BRIGHT_MAGENTA),
+	KW("return", COLOR_BRIGHT_MAGENTA),
+	KW("if", COLOR_BRIGHT_MAGENTA),
+	KW("then", COLOR_BRIGHT_MAGENTA),
+	KW("else", COLOR_BRIGHT_MAGENTA),
+	KW("elseif", COLOR_BRIGHT_MAGENTA),
+	KW("end", COLOR_BRIGHT_MAGENTA),
+	KW("for", COLOR_BRIGHT_MAGENTA),
+	KW("in", COLOR_BRIGHT_MAGENTA),
+	KW("do", COLOR_BRIGHT_MAGENTA),
+	KW("while", COLOR_BRIGHT_MAGENTA),
+	KW("repeat", COLOR_BRIGHT_MAGENTA),
+	KW("until", COLOR_BRIGHT_MAGENTA),
+	KW("break", COLOR_BRIGHT_MAGENTA),
+	KW("goto", COLOR_BRIGHT_MAGENTA),
 	/* Values */
 	KW("true", COLOR_GREEN),
 	KW("false", COLOR_RED),
 	KW("nil", COLOR_RED),
 	/* Operators */
-	KW("and", COLOR_BRIGHT_GREEN),
-	KW("or", COLOR_BRIGHT_GREEN),
-	KW("not", COLOR_BRIGHT_GREEN),
-	/* Standard library - cyan */
+	KW("and", COLOR_BRIGHT_MAGENTA),
+	KW("or", COLOR_BRIGHT_MAGENTA),
+	KW("not", COLOR_BRIGHT_MAGENTA),
+	/* Standard library - bright cyan */
 	KW("print", COLOR_CYAN),
 	KW("error", COLOR_CYAN),
 	KW("assert", COLOR_CYAN),

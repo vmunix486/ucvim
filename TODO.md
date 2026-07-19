@@ -8,7 +8,7 @@
 # ucvim TODO List
 
  - Better code highlighting (Markdown, Shell Scripts)
- - Add support for saving options in a file (eg. ~/.ucvimrc.ini on Unix/MSYS2, C:\Documents and Settings\$(USER)\ucvimrc.ini for Windows)
+ - Add support for saving options in a file (eg. ~/.ucvimrc.ini on Unix/MSYS2, C:\Documents and Settings\$(USER)\ucvimrc.ini for Windows) (putting off for now)
  - Test support on older operating systems and gcc versions
  - Make source code much more readable (with lots of code comments)
  - Fix some of the highlighting for Github Markdown
@@ -18,3 +18,19 @@
  - `:!i command` runs the system command given and writes the output of it into the current text file at the cursor location
  - If you scroll down a lot with Page Up or Page Down, it sometimes highlights the top line of the screenfull of characters.
  - Fix Delete key not working
+ - Bug: If you are on the bottom line on a screenful of text, and you type until the text wraps around, instead of scrolling the screen down, it puts the cursor at the top, making you need to scroll up and down again.
+ - Add support for deleting by word with CTRL+Backspace and CTRL+Delete
+ - Fix bug where the cursor and the text can become disconnected from eachother, causing the cursor to be 1 line down and 1 character forward from where the text should actually be. Probably a problem retaining to handling text wrapping.
+ 
+ 
+## Performance
+
+ - Syntax highlighting preforms lots of expensive operations on every redraw, such as repeated string searching for Lua, complex state tracking for comments, HTML tags, and code blocks, nested loops for markdown highlighting, and keyword matching by character in a loop.
+ - `expandTab` and `unexpandTab` functions call `editorRowInsertChar` and `editorTowDelChar`, which reallocates the entire row's chaacter buffeer, meaning that files with lots of tabs causes performance to suffer.
+ - Full screen redraw on every keypress. This can be a problem on very slow computers, large terminals, or complex syntax.
+ - Linear search in Undo/Redo. The circular buffer doesn't prevent O(historySize) searches, and there's no optimization for recent changes. Every undo/redo accesses memory potentially far from the working set.
+ - Inefficient Search Implementation. Called for every row until a match is found, and there is no caching or early termination optimization beyond the first match.
+ - Expensive Wide Character operations in Hot Paths. `wcwidth` can be slow for wide character detection, and is called for every visible character on every screen refresh.
+ - Unbounded position stack. No prevention of stack exhaustion. If the stack overflows, it only alerts the user and there is no recovery mechanism. Under repeated push operations, it could degrade performance.
+ - Inefficient keyword lookup. Clearing and rebuilding function/variable name tracking on every file open. No incremental parsing or caching. For files with thousands of fucntions, it rescans everything on each open.
+ - String Concatenation in Copy operations. `strcat` scans to end of string each call.

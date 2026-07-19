@@ -7,6 +7,8 @@
 
 # ucvim TODO List
 
- - Better code highlighting (Markdown, HTML, C, Shell Scripts, Lua)
+ - Better code highlighting (Markdown, HTML, C, Shell Scripts, Lua) (There is code highlighting but it needs to be better)
+ - More color
  - Add support for saving options in a file (eg. ~/.ucvimrc.ini on Unix/MSYS2, C:\Documents and Settings\$(USER)\ucvimrc.ini for Windows)
  - Add teminal restorement (like normal vim)
+ - Running system commands (with !{command})

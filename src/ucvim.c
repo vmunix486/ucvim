@@ -93,6 +93,8 @@ typedef wchar_t *kwtype;
 #define uc_strncmp wcsncmp
 #define uc_isprint(c) iswprint(c)
 #define uc_isalnum(c) iswalnum(c)
+#define uc_isdigit(c) iswdigit(c)
+#define uc_isalpha(c) iswalpha(c)
 #define uc_isspace(c) iswspace(c)
 #else
 typedef char ucchar;
@@ -140,6 +142,8 @@ uc_wcwidth(ucchar c)
 }
 #define uc_isprint(c) isprint((unsigned char)(c))
 #define uc_isalnum(c) isalnum((unsigned char)(c))
+#define uc_isdigit(c) isdigit((unsigned char)(c))
+#define uc_isalpha(c) isalpha((unsigned char)(c))
 #define uc_isspace(c) isspace((unsigned char)(c))
 #endif /* _WCHAR */
 
@@ -157,7 +161,12 @@ uc_ndup(const ucchar *s, size_t n)
 
 typedef enum {
 	COLOR_BLACK	= 0, COLOR_RED, COLOR_GREEN, COLOR_YELLOW, COLOR_BLUE,
-	COLOR_MAGENTA, COLOR_CYAN, COLOR_WHITE
+	COLOR_MAGENTA, COLOR_CYAN, COLOR_WHITE,
+	/* Bright colors (16-color mode) */
+	COLOR_BRIGHT_BLACK	= 8,
+	COLOR_BRIGHT_RED, COLOR_BRIGHT_GREEN, COLOR_BRIGHT_YELLOW,
+	COLOR_BRIGHT_BLUE, COLOR_BRIGHT_MAGENTA, COLOR_BRIGHT_CYAN,
+	COLOR_BRIGHT_WHITE = 15
 } Color;
 
 typedef struct {
@@ -173,8 +182,12 @@ typedef struct {
 	unsigned int italic	: 1;	/* [3m */
 	unsigned int underline	: 1;	/* [4m */
 	unsigned int reverse	: 1;	/* [7m */
-	unsigned int color	: 3;
+	unsigned int color	: 8;	/* ANSI color 0-255 */
 } Char_Attr;
+
+typedef enum {
+	HL_NONE = 0, HL_IN_COMMENT
+} HighlightState;
 
 /* This structure represents a single line of the file we are editing. */
 typedef struct {
@@ -182,6 +195,7 @@ typedef struct {
 	ucchar *chars;		/* Row content. */
 	int asize;		/* Size of attr */
 	Char_Attr *attr;	/* Character attributes */
+	HighlightState hlState;	/* Highlight state from previous line */
 } erow;
 
 typedef struct {
@@ -234,6 +248,7 @@ static struct editorConfig {
 	/*	Modes		*/
 	int readOnly;
 	int noColor;
+	int colorDepth;
 } E;
 
 static struct editorConfig E;
@@ -643,39 +658,162 @@ renderTrailingSpace(erow *row)
 	}
 }
 
-INLINE int
-isSeperator(ucchar *p)
-{
-	return !uc_isalnum(*p) && *p != UCC('_') && *p != UCC('-');
-}
-
 static void
-renderKeywords(erow *row)
+renderKeywords(erow *row, erow *prev)
 {
 	kwtype *keyword;
 	size_t len;
-	ucchar *p;
 	size_t i;
+	int inComment, inString;
+	ucchar *p, *end;
+	ucchar prevChar;
+	int j;
 
 	if (!row->size)
 		return;
 
-	for (keyword = E.keywords; *keyword; keyword++) {
-		len = uc_strlen(*keyword);
-		for (p = uc_strstr(row->chars, *keyword); p;
-		     p = uc_strstr(p, *keyword)) {
-		     	if ((p != row->chars && !isSeperator(p - 1)) ||
-			    !isSeperator(p + len)) {
-				p += len;
+	inComment = (prev && prev->hlState == HL_IN_COMMENT);
+	inString = 0;
+	prevChar = UCC('\0');
+
+	/* Preprocessor directive: #define, #include, etc. */
+	if (row->chars[0] == UCC('#')) {
+		const char *ppwords[] = {
+			"define", "include", "ifdef", "ifndef", "endif",
+			"if", "else", "elif", "undef", "pragma", "error",
+			"warning", "line", NULL
+		};
+		const char **pw;
+		for (pw = ppwords; *pw; pw++) {
+			size_t plen = strlen(*pw);
+			int match = 1;
+			size_t k;
+			if (1 + plen > (size_t)row->size)
 				continue;
+			for (k = 0; k < plen; k++) {
+				if ((ucchar)(*pw)[k] != row->chars[1 + k]) {
+					match = 0;
+					break;
+				}
 			}
-			for (i = 0; i < len; i++)
-				row->attr[p - row->chars + i].color =
-					C.highlightKeywordColor;
-			p += len;
+			if (match && !uc_isalnum(row->chars[1 + plen])) {
+				for (j = 0; j <= (int)plen; j++)
+					row->attr[j].color = COLOR_MAGENTA;
+				/* Color the rest of the directive */
+				for (j = plen + 1; j < row->size; j++) {
+					if (row->chars[j] == UCC('/') &&
+					    j + 1 < row->size &&
+					    row->chars[j+1] == UCC('/'))
+						break;
+					row->attr[j].color = COLOR_MAGENTA;
+				}
+				break;
+			}
 		}
 	}
-	return;
+
+	for (p = row->chars, end = row->chars + row->size, i = 0;
+	     p < end; p++, i++) {
+
+		/* Inside multi-line comment */
+		if (inComment) {
+			row->attr[i].color = COLOR_BRIGHT_CYAN;
+			if (prevChar == UCC('*') && *p == UCC('/')) {
+				inComment = 0;
+				row->attr[i].color = COLOR_BRIGHT_CYAN;
+			}
+			prevChar = *p;
+			continue;
+		}
+
+		/* Inside string */
+		if (inString) {
+			row->attr[i].color = COLOR_BRIGHT_YELLOW;
+			if (prevChar != UCC('\\') && *p == inString)
+				inString = 0;
+			prevChar = *p;
+			continue;
+		}
+
+		/* Single-line comment: // */
+		if (*p == UCC('/') && (p + 1) < end && *(p+1) == UCC('/')) {
+			for (j = i; j < row->size; j++)
+				row->attr[j].color = COLOR_BRIGHT_CYAN;
+			row->hlState = HL_NONE;
+			return;
+		}
+
+		/* Multi-line comment start: /* */
+		if (*p == UCC('/') && (p + 1) < end && *(p+1) == UCC('*')) {
+			row->attr[i].color = COLOR_BRIGHT_CYAN;
+			inComment = 1;
+			prevChar = *p;
+			continue;
+		}
+
+		/* String start */
+		if (*p == UCC('"') || *p == UCC('\'')) {
+			inString = *p;
+			row->attr[i].color = COLOR_BRIGHT_YELLOW;
+			prevChar = *p;
+			continue;
+		}
+
+		/* Keyword match */
+		if (E.keywords && (uc_isalnum(*p) || *p == UCC('_'))) {
+			/* Find start of word */
+			if (p != row->chars &&
+			    (uc_isalnum(*(p-1)) || *(p-1) == UCC('_')))
+			{
+				prevChar = *p;
+				continue;
+			}
+			/* Try each keyword */
+			for (keyword = E.keywords; *keyword; keyword++) {
+				len = uc_strlen(*keyword);
+				if (uc_strncmp(p, *keyword, len) == 0) {
+					ucchar *next = p + len;
+					if (next >= end ||
+					    (!uc_isalnum(*next) &&
+					     *next != UCC('_'))) {
+						for (j = 0; j < (int)len; j++)
+							row->attr[i + j].color =
+								COLOR_BRIGHT_GREEN;
+						p += len - 1;
+						i += len - 1;
+						break;
+					}
+				}
+			}
+		}
+
+		/* Number literal */
+		if (uc_isdigit(*p) ||
+		    (*p == UCC('.') && (p + 1) < end && uc_isdigit(*(p+1)))) {
+			/* Check it's the start of a number */
+			if (p == row->chars ||
+			    (!uc_isalnum(*(p-1)) && *(p-1) != UCC('_'))) {
+				for (j = i; j < row->size; j++) {
+					if (uc_isdigit(row->chars[j]) ||
+					    row->chars[j] == UCC('.') ||
+					    row->chars[j] == UCC('x') ||
+					    row->chars[j] == UCC('X') ||
+					    row->chars[j] == UCC('e') ||
+					    row->chars[j] == UCC('E'))
+						row->attr[j].color = COLOR_CYAN;
+					else if (uc_isalpha(row->chars[j]) ||
+						 row->chars[j] == UCC('_'))
+						continue;
+					else
+						break;
+				}
+			}
+		}
+
+		prevChar = *p;
+	}
+
+	row->hlState = inComment ? HL_IN_COMMENT : HL_NONE;
 }
 
 /*
@@ -703,7 +841,7 @@ editorUpdateRow(erow *row)
 	y = row - E.row;
 
 	if (E.keywords && !E.noColor)
-		renderKeywords(row);
+		renderKeywords(row, y > 0 ? &E.row[y - 1] : NULL);
 
 	if (E.mode == MODE_VISUAL)
 		renderSelect(row, y);
@@ -1178,28 +1316,46 @@ editorWidthFrom(int start)
 
 /* ============================= Terminal update ============================ */
 
-INLINE void
+static void
+writeAttrColor(int color)
+{
+	if (E.colorDepth <= 8) {
+		/* Basic 8 colors: 0-7 */
+		printf("\x1b[3%um", (unsigned int)(color & 7));
+	} else if (E.colorDepth <= 16) {
+		/* 16 colors: 0-7 use 30-37, 8-15 use 90-97 */
+		if (color < 8)
+			printf("\x1b[3%um", (unsigned int)color);
+		else
+			printf("\x1b[%um", (unsigned int)(90 + color - 8));
+	} else {
+		/* 256 colors */
+		printf("\x1b[38;5;%um", (unsigned int)color);
+	}
+}
+
+void
 switchAttr(Char_Attr *old, Char_Attr *new_attr)
 {
 	if (old->color != new_attr->color)
-		printf("\x1b[3%um", (unsigned int)new_attr->color);
+		writeAttrColor(new_attr->color);
 	old->color = new_attr->color;
 
-	if (*(uint8_t*)old == *(uint8_t*)new_attr)
-		return;
-
-	writeString("\x1b[0m");
-	if (new_attr->bold)
-		writeString("\x1b[1m");
-	if (new_attr->italic)
-		writeString("\x1b[3m");
-	if (new_attr->underline)
-		writeString("\x1b[4m");
-	if (new_attr->reverse)
-		writeString("\x1b[7m");
-	printf("\x1b[3%um", (unsigned int)new_attr->color);
-
-	return;
+	if (old->bold != new_attr->bold ||
+	    old->italic != new_attr->italic ||
+	    old->underline != new_attr->underline ||
+	    old->reverse != new_attr->reverse) {
+		writeString("\x1b[0m");
+		if (new_attr->bold)
+			writeString("\x1b[1m");
+		if (new_attr->italic)
+			writeString("\x1b[3m");
+		if (new_attr->underline)
+			writeString("\x1b[4m");
+		if (new_attr->reverse)
+			writeString("\x1b[7m");
+		writeAttrColor(new_attr->color);
+	}
 }
 
 INLINE int
@@ -2647,6 +2803,8 @@ initEditor(void)
 	E.posStack	= malloc(sizeof(int) * C.positionStackSize);
 	E.posTop	= 0;
 
+	E.colorDepth	= 16;
+
 	updateWindowSize();
 	signal(SIGWINCH, handleSigWinCh);
 }
@@ -2660,6 +2818,7 @@ usage(const char *prog)
 	fprintf(stderr, "  --help         Show this help message\n");
 	fprintf(stderr, "  --version      Show version information\n");
 	fprintf(stderr, "  --no-color     Disable syntax highlighting\n");
+	fprintf(stderr, "  --colors=N     Color depth: 8, 16, or 256 (default: 16)\n");
 	fprintf(stderr, "  --read-only    Open file in read-only mode\n");
 	fprintf(stderr, "  -R             Same as --read-only\n");
 	fprintf(stderr, "  -              Read from standard input\n");
@@ -2696,6 +2855,13 @@ main(int argc, const char *argv[])
 		}
 		if (!strcmp(argv[i], "--no-color")) {
 			E.noColor = 1;
+			continue;
+		}
+		if (!strncmp(argv[i], "--colors=", 9)) {
+			E.colorDepth = atoi(argv[i] + 9);
+			if (E.colorDepth != 8 && E.colorDepth != 16 &&
+			    E.colorDepth != 256)
+				E.colorDepth = 16;
 			continue;
 		}
 		if (!strcmp(argv[i], "--read-only") ||

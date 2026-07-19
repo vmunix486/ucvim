@@ -195,7 +195,8 @@ typedef struct {
 } Char_Attr;
 
 typedef enum {
-	HL_NONE = 0, HL_IN_COMMENT, HL_IN_HTML_COMMENT, HL_IN_A_TAG
+	HL_NONE = 0, HL_IN_COMMENT, HL_IN_HTML_COMMENT, HL_IN_A_TAG,
+	HL_IN_MD_CODEBLOCK
 } HighlightState;
 
 /* This structure represents a single line of the file we are editing. */
@@ -734,6 +735,194 @@ renderKeywords(erow *row, erow *prev)
 		}
 	}
 
+	/* Markdown highlighting (GitHub-flavored) */
+	if (E.lang == L_MARKDOWN) {
+		/* Fenced code block: ``` */
+		if (row->hlState == HL_IN_MD_CODEBLOCK) {
+			/* Inside code block - color everything yellow */
+			for (j = 0; j < row->size; j++)
+				row->attr[j].color = COLOR_BRIGHT_YELLOW;
+			/* Check if this line closes the block (``` at start) */
+			if (row->size >= 3 &&
+			    row->chars[0] == UCC('`') &&
+			    row->chars[1] == UCC('`') &&
+			    row->chars[2] == UCC('`')) {
+				row->hlState = HL_NONE;
+			}
+			return;
+		}
+		/* Check for opening ``` */
+		if (row->size >= 3 &&
+		    row->chars[0] == UCC('`') &&
+		    row->chars[1] == UCC('`') &&
+		    row->chars[2] == UCC('`')) {
+			for (j = 0; j < row->size; j++)
+				row->attr[j].color = COLOR_BRIGHT_YELLOW;
+			row->hlState = HL_IN_MD_CODEBLOCK;
+			return;
+		}
+		/* Header: # through ###### */
+		if (row->chars[0] == UCC('#')) {
+			int hashes = 0;
+			while (hashes < row->size && row->chars[hashes] == UCC('#'))
+				hashes++;
+			if (hashes <= 6 &&
+			    (hashes >= row->size || row->chars[hashes] == UCC(' '))) {
+				for (j = 0; j < row->size; j++)
+					row->attr[j].color = COLOR_BRIGHT_MAGENTA;
+				return;
+			}
+		}
+		/* Blockquote: > */
+		if (row->chars[0] == UCC('>')) {
+			for (j = 0; j < row->size; j++)
+				row->attr[j].color = COLOR_BRIGHT_CYAN;
+			return;
+		}
+		/* Horizontal rule: --- or *** or ___ */
+		if (row->size >= 3 &&
+		    ((row->chars[0] == UCC('-') && row->chars[1] == UCC('-') && row->chars[2] == UCC('-')) ||
+		     (row->chars[0] == UCC('*') && row->chars[1] == UCC('*') && row->chars[2] == UCC('*')) ||
+		     (row->chars[0] == UCC('_') && row->chars[1] == UCC('_') && row->chars[2] == UCC('_')))) {
+			int allSame = 1;
+			for (j = 1; j < row->size; j++) {
+				if (row->chars[j] != row->chars[0]) {
+					allSame = 0;
+					break;
+				}
+			}
+			if (allSame) {
+				for (j = 0; j < row->size; j++)
+					row->attr[j].color = COLOR_BRIGHT_BLACK;
+				return;
+			}
+		}
+		/* List markers: - or * or 1. */
+		if (row->size >= 2 &&
+		    (row->chars[0] == UCC('-') || row->chars[0] == UCC('*')) &&
+		    row->chars[1] == UCC(' ')) {
+			row->attr[0].color = COLOR_BRIGHT_MAGENTA;
+			row->attr[1].color = COLOR_BRIGHT_MAGENTA;
+		}
+		if (row->size >= 3 &&
+		    row->chars[0] >= UCC('1') && row->chars[0] <= UCC('9') &&
+		    row->chars[1] == UCC('.') && row->chars[2] == UCC(' ')) {
+			row->attr[0].color = COLOR_BRIGHT_MAGENTA;
+			row->attr[1].color = COLOR_BRIGHT_MAGENTA;
+			row->attr[2].color = COLOR_BRIGHT_MAGENTA;
+		}
+		/* Inline highlighting for the rest of the line */
+		{
+			ucchar *mp;
+			int mi;
+			int inInlineCode = 0;
+			int inBold = 0;
+			int inItalic = 0;
+			for (mp = row->chars, mi = 0;
+			     mi < row->size; mp++, mi++) {
+				/* Inline code: ` */
+				if (*mp == UCC('`')) {
+					row->attr[mi].color = COLOR_BRIGHT_YELLOW;
+					inInlineCode = !inInlineCode;
+					continue;
+				}
+				if (inInlineCode) {
+					row->attr[mi].color = COLOR_BRIGHT_YELLOW;
+					continue;
+				}
+				/* Bold: ** */
+				if (*mp == UCC('*') && (mi + 1) < row->size && *(mp+1) == UCC('*')) {
+					row->attr[mi].color = COLOR_WHITE;
+					row->attr[mi + 1].color = COLOR_WHITE;
+					inBold = !inBold;
+					mp++; mi++;
+					continue;
+				}
+				/* Italic: * (single, not part of ** or list) */
+				if (*mp == UCC('*') && !inBold) {
+					/* Check it's not a list marker at start */
+					if (mi > 0 || (mi == 0 && row->size >= 2 && row->chars[1] != UCC(' '))) {
+						row->attr[mi].color = COLOR_WHITE;
+						inItalic = !inItalic;
+						continue;
+					}
+				}
+				/* Image: ![ */
+				if (*mp == UCC('!') && (mi + 1) < row->size && *(mp+1) == UCC('[')) {
+					row->attr[mi].color = COLOR_BRIGHT_BLUE;
+					row->attr[mi + 1].color = COLOR_BRIGHT_BLUE;
+					mp++; mi++;
+					continue;
+				}
+				/* Link: [text](url) */
+				if (*mp == UCC('[')) {
+					row->attr[mi].color = COLOR_BRIGHT_BLUE;
+					continue;
+				}
+				if (*mp == UCC(']') && (mi + 1) < row->size && *(mp+1) == UCC('(')) {
+					row->attr[mi].color = COLOR_BRIGHT_BLUE;
+					row->attr[mi + 1].color = COLOR_BRIGHT_BLUE;
+					mp++; mi++;
+					continue;
+				}
+				if (*mp == UCC('(') && mi > 0 && row->chars[mi - 1] == UCC(']')) {
+					row->attr[mi].color = COLOR_BRIGHT_CYAN;
+					continue;
+				}
+				if (*mp == UCC(')') && mi > 0 && row->chars[mi - 1] != UCC('(')) {
+					/* Check if we're inside a link url */
+					int k;
+					for (k = mi - 1; k >= 0; k--) {
+						if (row->chars[k] == UCC('[')) break;
+						if (row->chars[k] == UCC('(')) {
+							row->attr[mi].color = COLOR_BRIGHT_CYAN;
+							break;
+						}
+					}
+				}
+				/* Strikethrough: ~~ */
+				if (*mp == UCC('~') && (mi + 1) < row->size && *(mp+1) == UCC('~')) {
+					row->attr[mi].color = COLOR_BRIGHT_RED;
+					row->attr[mi + 1].color = COLOR_BRIGHT_RED;
+					mp++; mi++;
+					continue;
+				}
+				/* HTML tags */
+				if (*mp == UCC('<') && (mi + 1) < row->size && *(mp+1) == UCC('/')) {
+					ucchar *tp = mp + 2;
+					int ti = mi + 2;
+					row->attr[mi].color = COLOR_BRIGHT_MAGENTA;
+					row->attr[mi + 1].color = COLOR_BRIGHT_MAGENTA;
+					while (tp < row->chars + row->size && *tp != UCC('>')) {
+						row->attr[ti].color = COLOR_BRIGHT_MAGENTA;
+						tp++; ti++;
+					}
+					if (tp < row->chars + row->size) {
+						row->attr[ti].color = COLOR_BRIGHT_MAGENTA;
+					}
+					mp = tp; mi = (int)(tp - row->chars);
+					continue;
+				}
+				if (*mp == UCC('<') && (mi + 1) < row->size &&
+				    ((*(mp+1) >= UCC('a') && *(mp+1) <= UCC('z')) ||
+				     (*(mp+1) >= UCC('A') && *(mp+1) <= UCC('Z')))) {
+					ucchar *tp = mp + 1;
+					int ti = mi + 1;
+					row->attr[mi].color = COLOR_BRIGHT_MAGENTA;
+					while (tp < row->chars + row->size && *tp != UCC('>')) {
+						row->attr[ti].color = COLOR_BRIGHT_MAGENTA;
+						tp++; ti++;
+					}
+					if (tp < row->chars + row->size) {
+						row->attr[ti].color = COLOR_BRIGHT_MAGENTA;
+					}
+					mp = tp; mi = (int)(tp - row->chars);
+					continue;
+				}
+			}
+		}
+	}
+
 	/* Detect function definitions: "function name(params)" (Lua only) */
 	if (E.lang == L_LUA) {
 		ucchar *fp;
@@ -1006,9 +1195,9 @@ renderKeywords(erow *row, erow *prev)
 			continue;
 		}
 
-		/* String start (HTML only uses ", not ') */
+		/* String start (HTML/Markdown only use ", not ') */
 		if (*p == UCC('"') ||
-		    (E.lang != L_HTML && *p == UCC('\''))) {
+		    (E.lang != L_HTML && E.lang != L_MARKDOWN && *p == UCC('\''))) {
 			inString = *p;
 			row->attr[i].color = COLOR_BRIGHT_YELLOW;
 			prevChar = *p;
@@ -1174,9 +1363,10 @@ renderKeywords(erow *row, erow *prev)
 			}
 		}
 
-		/* Number literal */
-		if (uc_isdigit(*p) ||
-		    (*p == UCC('.') && (p + 1) < end && uc_isdigit(*(p+1)))) {
+		/* Number literal (not in Markdown) */
+		if (E.lang != L_MARKDOWN &&
+		    (uc_isdigit(*p) ||
+		    (*p == UCC('.') && (p + 1) < end && uc_isdigit(*(p+1))))) {
 			/* Check it's the start of a number */
 			if (p == row->chars ||
 			    (!uc_isalnum(*(p-1)) && *(p-1) != UCC('_'))) {
@@ -1200,7 +1390,16 @@ renderKeywords(erow *row, erow *prev)
 		prevChar = *p;
 	}
 
-	row->hlState = inComment ? HL_IN_COMMENT : HL_NONE;
+	if (inComment)
+		row->hlState = HL_IN_COMMENT;
+	else if (row->hlState == HL_IN_MD_CODEBLOCK)
+		; /* preserve markdown code block state */
+	else if (row->hlState == HL_IN_HTML_COMMENT)
+		; /* preserve HTML comment state */
+	else if (row->hlState == HL_IN_A_TAG)
+		; /* preserve a-tag state */
+	else
+		row->hlState = HL_NONE;
 }
 
 /*

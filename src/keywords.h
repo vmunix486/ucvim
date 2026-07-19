@@ -7,6 +7,7 @@
 #define L_DEFAULT 0
 #define L_LUA 1
 #define L_HTML 2
+#define L_MARKDOWN 3
 
 /* Default keyword color for most languages */
 #define KC COLOR_BRIGHT_MAGENTA
@@ -412,8 +413,8 @@ Keyword_Class K[] = {
 	{ ".ac", L_DEFAULT, __m4Keywords },
 	{ ".html", L_HTML, __htmlKeywords },
 	{ ".htm", L_HTML, __htmlKeywords },
-	{ ".md", L_DEFAULT, __markdownKeywords },
-	{ ".markdown", L_DEFAULT, __markdownKeywords },
+	{ ".md", L_MARKDOWN, __markdownKeywords },
+	{ ".markdown", L_MARKDOWN, __markdownKeywords },
 	{ NULL, 0, NULL },
 };
 

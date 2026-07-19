@@ -1379,9 +1379,14 @@ drawRowAt(int at, int remainSpace, int doWrite, int gutter)
 	if (doWrite && gutter > 0) {
 		char numbuf[16];
 		int numwidth = gutter - 1;
+		int isCurLine = (at == E.rowoff + E.cy);
 		if (numwidth < 1) numwidth = 1;
+		if (isCurLine)
+			writeString("\x1b[1;33m");	/* Bold yellow */
 		snprintf(numbuf, sizeof(numbuf), "%*d ", numwidth, at + 1);
 		writeString(numbuf);
+		if (isCurLine)
+			writeString("\x1b[0m");
 	}
 
 	for (i = 0, width = 0; i < row->size; i++) {
@@ -1478,7 +1483,7 @@ editorRefreshScreen(int doWrite)
 					      "ucvim");
 				padding = (available - wellen) / 2;
 				if (padding) {
-					putchar('~');
+					writeString("\x1b[34m~\x1b[0m");
 					padding--;
 				}
 				while(padding--)
@@ -1491,7 +1496,7 @@ editorRefreshScreen(int doWrite)
 					for (g = 0; g < gutter; g++)
 						putchar(' ');
 				}
-				writeString("~\x1b[0K\r\n");
+				writeString("\x1b[34m~\x1b[0m\x1b[0K\r\n");
 			}
 			printedLine = 1;
 			continue;

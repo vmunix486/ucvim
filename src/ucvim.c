@@ -326,9 +326,8 @@ editorAtExit(void)
 
 	free(E.posStack);
 
-	/*	Reset cursor position	*/
-	printf("\x1b[%d;0H\x1b[0K", E.screenrows + 1);
-	printf("\x1b[?25h");
+	/* Switch back from alternate screen buffer, restore terminal */
+	printf("\x1b[?1049l");
 	fflush(stdout);
 	return;
 }
@@ -1997,6 +1996,9 @@ commandMode(void)
 		int ttyfd;
 		char c;
 		exitRawMode('\0');
+		/* Switch back to main screen for command output */
+		writeString("\x1b[?1049l");
+		fflush(stdout);
 		system(cmd + 1);
 		printf("\r\nPress Enter to continue...");
 		fflush(stdout);
@@ -2315,6 +2317,9 @@ getManual(void)
 	int pid;
 
 	exitRawMode('\0');
+	/* Switch back to main screen for man page */
+	writeString("\x1b[?1049l");
+	fflush(stdout);
 
 	keyword = getKeywordUnderCursor();
 	if (!keyword) {
@@ -2483,6 +2488,9 @@ processKeyNormal(int fd, int key)
 				break;
 			}
 			exitRawMode('\0');
+			/* Switch back to main screen for command output */
+			writeString("\x1b[?1049l");
+			fflush(stdout);
 			system(shcmd);
 			printf("\r\nPress Enter to continue...");
 			fflush(stdout);
@@ -2530,6 +2538,9 @@ processKeyNormal(int fd, int key)
 		break;
 	case CTRL_Z:
 		exitRawMode('\0');
+		/* Switch back to main screen before suspending */
+		writeString("\x1b[?1049l");
+		fflush(stdout);
 		raise(SIGSTOP);
 		enableRawMode();
 		raise(SIGWINCH);
@@ -2945,6 +2956,9 @@ main(int argc, const char *argv[])
 	}
 
 	enableRawMode();
+	/* Switch to alternate screen buffer */
+	printf("\x1b[?1049h");
+	fflush(stdout);
 	atexit(editorAtExit);
 	while(1) {
 		editorRefreshScreen(true);

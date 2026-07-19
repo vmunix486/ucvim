@@ -1726,6 +1726,30 @@ editorDelChar(void)
 		editorUpdateRow(row);
 }
 
+/* Delete the character at the cursor position (forward delete). */
+void
+editorDelForwardChar(void)
+{
+	int filerow = E.rowoff + E.cy;
+	erow *row = (filerow >= E.numrows) ? NULL : &E.row[filerow];
+
+	if (!row)
+		return;
+
+	if (E.cx >= row->size) {
+		/* At end of line: join with next line */
+		if (filerow + 1 >= E.numrows)
+			return;
+		editorCommitChange(filerow, filerow);
+		editorRowAppendString(row, E.row[filerow + 1].chars,
+				      E.row[filerow + 1].size);
+		editorDelRow(filerow + 1);
+		editorUpdateRow(row);
+	} else {
+		editorRowDelChar(row, E.cx);
+	}
+}
+
 ucchar *
 editorCopyRange(int sx, int sy, int ex, int ey)
 {
@@ -2145,7 +2169,8 @@ drawRowAt(int at, int remainSpace, int doWrite, int gutter)
 				return 0;
 		}
 
-		if (*(uint8_t*)(row->attr + i) != *(uint8_t*)&lastAttr) {
+		if (*(uint8_t*)(row->attr + i) != *(uint8_t*)&lastAttr ||
+		    row->attr[i].bg != lastAttr.bg) {
 			switchAttr(&lastAttr, row->attr + i);
 			lastAttr = row->attr[i];
 		}
@@ -3375,6 +3400,9 @@ processKeyInsert(int fd, int key)
 	case CTRL_BACKSPACE:
 	case BACKSPACE:
 		editorDelChar();
+		break;
+	case DEL_KEY:
+		editorDelForwardChar();
 		break;
 	case HOME_KEY:
 		E.cx = 0;

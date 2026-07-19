@@ -7,7 +7,7 @@
 
 # ucvim TODO List
 
- - Better code highlighting (Markdown, C, Shell Scripts)
+ - Better code highlighting (Markdown, Shell Scripts)
  - Add support for saving options in a file (eg. ~/.ucvimrc.ini on Unix/MSYS2, C:\Documents and Settings\$(USER)\ucvimrc.ini for Windows)
  - Test support on older operating systems and gcc versions
  - Make source code much more readable (with lots of code comments)

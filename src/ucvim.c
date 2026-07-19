@@ -251,6 +251,8 @@ static struct editorConfig {
 	Keyword *keywords;
 	kwtype *funcNames;
 	int numFuncNames;
+	kwtype *varNames;
+	int numVarNames;
 	int lang;		/* Current language ID */
 
 	/*	Position Stack		*/
@@ -768,6 +770,104 @@ renderKeywords(erow *row, erow *prev)
 		}
 	}
 
+	/* Detect variable assignments: "local name =" or "name =" */
+	if (E.lang == L_LUA) {
+		ucchar *vp;
+		for (vp = row->chars; vp < row->chars + row->size - 1; vp++) {
+			int isLocal = 0;
+			ucchar *nameStart, *nameEnd;
+			int nameLen;
+
+			/* Skip if inside a string or comment */
+			if (*vp == UCC('"') || *vp == UCC('\'') ||
+			    *vp == UCC('-'))
+				continue;
+
+			/* Check for "local" prefix */
+			if (vp == row->chars ||
+			    (!uc_isalnum(*(vp-1)) && *(vp-1) != UCC('_'))) {
+				if (uc_strncmp(vp, UCL("local"), 5) == 0 &&
+				    !uc_isalnum(vp[5]) && vp[5] != UCC('_')) {
+					vp += 5;
+					isLocal = 1;
+				}
+			}
+
+			/* Skip if we matched "local function" or "local if" etc. */
+			if (isLocal) {
+				while (vp < row->chars + row->size && *vp == UCC(' '))
+					vp++;
+				if (uc_strncmp(vp, UCL("function"), 8) == 0 ||
+				    uc_strncmp(vp, UCL("if"), 2) == 0 ||
+				    uc_strncmp(vp, UCL("for"), 3) == 0 ||
+				    uc_strncmp(vp, UCL("while"), 5) == 0 ||
+				    uc_strncmp(vp, UCL("return"), 6) == 0)
+					continue;
+			}
+
+			/* Read the name */
+			nameStart = vp;
+			while (vp < row->chars + row->size &&
+			       (uc_isalnum(*vp) || *vp == UCC('_')))
+				vp++;
+			nameEnd = vp;
+			nameLen = (int)(nameEnd - nameStart);
+
+			if (nameLen <= 0)
+				continue;
+
+			/* Skip keywords */
+			if ((nameLen == 5 && uc_strncmp(nameStart, UCL("local"), 5) == 0) ||
+			    (nameLen == 8 && uc_strncmp(nameStart, UCL("function"), 8) == 0) ||
+			    (nameLen == 4 && uc_strncmp(nameStart, UCL("true"), 4) == 0) ||
+			    (nameLen == 5 && uc_strncmp(nameStart, UCL("false"), 5) == 0) ||
+			    (nameLen == 3 && uc_strncmp(nameStart, UCL("nil"), 3) == 0) ||
+			    (nameLen == 2 && uc_strncmp(nameStart, UCL("if"), 2) == 0) ||
+			    (nameLen == 4 && uc_strncmp(nameStart, UCL("then"), 4) == 0) ||
+			    (nameLen == 4 && uc_strncmp(nameStart, UCL("else"), 4) == 0) ||
+			    (nameLen == 3 && uc_strncmp(nameStart, UCL("end"), 3) == 0) ||
+			    (nameLen == 3 && uc_strncmp(nameStart, UCL("for"), 3) == 0) ||
+			    (nameLen == 2 && uc_strncmp(nameStart, UCL("do"), 2) == 0) ||
+			    (nameLen == 5 && uc_strncmp(nameStart, UCL("while"), 5) == 0) ||
+			    (nameLen == 3 && uc_strncmp(nameStart, UCL("and"), 3) == 0) ||
+			    (nameLen == 2 && uc_strncmp(nameStart, UCL("or"), 2) == 0) ||
+			    (nameLen == 3 && uc_strncmp(nameStart, UCL("not"), 3) == 0) ||
+			    (nameLen == 3 && uc_strncmp(nameStart, UCL("not"), 3) == 0))
+				continue;
+
+			/* Look for '=' after the name */
+			{
+				ucchar *eq = vp;
+				while (eq < row->chars + row->size && *eq == UCC(' '))
+					eq++;
+				if (*eq == UCC('=') && *(eq+1) != UCC('=')) {
+					/* Found "name =" - add to var list */
+					int idx = E.numVarNames;
+					int already = 0;
+					int vi;
+					/* Check if already tracked */
+					for (vi = 0; vi < E.numVarNames; vi++) {
+						if (uc_strlen(E.varNames[vi]) == (size_t)nameLen &&
+						    uc_strncmp(E.varNames[vi], nameStart, nameLen) == 0) {
+							already = 1;
+							break;
+						}
+					}
+					if (!already) {
+						E.varNames = realloc(E.varNames,
+							sizeof(kwtype) * (idx + 2));
+						E.varNames[idx] = malloc(
+							sizeof(ucchar) * (nameLen + 1));
+						uc_strncpy(E.varNames[idx], nameStart, nameLen);
+						E.varNames[idx][nameLen] = UCC('\0');
+						E.numVarNames = idx + 1;
+						E.varNames[idx + 1] = NULL;
+					}
+				}
+			}
+		}
+	}
+
 	for (p = row->chars, end = row->chars + row->size, i = 0;
 	     p < end; p++, i++) {
 
@@ -862,6 +962,26 @@ renderKeywords(erow *row, erow *prev)
 							for (j = 0; j < (int)len; j++)
 								row->attr[i + j].color =
 									COLOR_BLUE;
+							p += len - 1;
+							i += len - 1;
+							break;
+						}
+					}
+				}
+			}
+			/* Try variable names (if no keyword or func matched) */
+			if (!keyword->word && E.varNames) {
+				int vi;
+				for (vi = 0; vi < E.numVarNames; vi++) {
+					len = uc_strlen(E.varNames[vi]);
+					if (uc_strncmp(p, E.varNames[vi], len) == 0) {
+						ucchar *next = p + len;
+						if (next >= end ||
+						    (!uc_isalnum(*next) &&
+						     *next != UCC('_'))) {
+							for (j = 0; j < (int)len; j++)
+								row->attr[i + j].color =
+									COLOR_BRIGHT_RED;
 							p += len - 1;
 							i += len - 1;
 							break;
@@ -1284,7 +1404,7 @@ editorOpen(const char *filename)
 		}
 	}
 
-	/* Clear function name tracking for new file */
+	/* Clear function and variable name tracking for new file */
 	{
 		int fi;
 		for (fi = 0; fi < E.numFuncNames; fi++)
@@ -1292,6 +1412,11 @@ editorOpen(const char *filename)
 		free(E.funcNames);
 		E.funcNames = NULL;
 		E.numFuncNames = 0;
+		for (fi = 0; fi < E.numVarNames; fi++)
+			free(E.varNames[fi]);
+		free(E.varNames);
+		E.varNames = NULL;
+		E.numVarNames = 0;
 	}
 
 	fp = fopen(filename, "r");

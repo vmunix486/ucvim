@@ -21,6 +21,7 @@
  - Fix bug where the cursor and the text can become disconnected from eachother, causing the cursor to be 1 line down and sometimes 1 character forward from where the text should actually be. Probably a problem retaining to handling text wrapping. Or something else. It sometimes happens when you open the editor, and change terminal sizes within the editor, so it might be handlining terminal size incorrectly, and thinking the cursor is in the correct place, when the actual cursor rendered by the terminal is in someplace else. Maybe sync the terminal cursor location with the editor cursor location.
  - Sometimes the gutter just... doesn't show up? (like while editing this)
  - When typing a line that wraps around on the last rendered line, it creates a new line that does not wrap around (makes a literal new line, and doesn't keep it on the same line)
+ - Add support for the following: If a line wraps around multiple times and there's not enough space to render the whole line wrapped, then don't render it at all, and just have a blue at symbol (@), like when there is no line there, which is a blue tilde (~)
  
  
 ## Performance

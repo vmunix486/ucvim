@@ -170,8 +170,17 @@ typedef enum {
 } Color;
 
 typedef struct {
+	kwtype word;
+	int color;
+} Keyword;
+
+#define KW(w, c) { UCL(w), c }
+#define KW_END { NULL, 0 }
+
+typedef struct {
 	char *suffix;
-	kwtype *keywords;
+	int lang;		/* Language ID for lang-specific rules */
+	Keyword *keywords;
 } Keyword_Class;
 
 #include"keywords.h"
@@ -239,7 +248,10 @@ static struct editorConfig {
 	int lastMatchX, lastMatchY;
 
 	/*	Keyword Highlight	*/
-	kwtype *keywords;
+	Keyword *keywords;
+	kwtype *funcNames;
+	int numFuncNames;
+	int lang;		/* Current language ID */
 
 	/*	Position Stack		*/
 	int *posStack;
@@ -660,7 +672,7 @@ renderTrailingSpace(erow *row)
 static void
 renderKeywords(erow *row, erow *prev)
 {
-	kwtype *keyword;
+	Keyword *keyword;
 	size_t len;
 	size_t i;
 	int inComment, inString;
@@ -674,6 +686,15 @@ renderKeywords(erow *row, erow *prev)
 	inComment = (prev && prev->hlState == HL_IN_COMMENT);
 	inString = 0;
 	prevChar = UCC('\0');
+
+	/* Shebang: #!... (first line) */
+	if (!prev && row->size > 1 && row->chars[0] == UCC('#') &&
+	    row->chars[1] == UCC('!')) {
+		for (j = 0; j < row->size; j++)
+			row->attr[j].color = COLOR_BLUE;
+		row->hlState = HL_NONE;
+		return;
+	}
 
 	/* Preprocessor directive: #define, #include, etc. */
 	if (row->chars[0] == UCC('#')) {
@@ -711,6 +732,42 @@ renderKeywords(erow *row, erow *prev)
 		}
 	}
 
+	/* Detect function definitions: "function name(" */
+	{
+		ucchar *fp;
+		for (fp = row->chars; fp < row->chars + row->size - 1; fp++) {
+			if (fp == row->chars ||
+			    (!uc_isalnum(*(fp-1)) && *(fp-1) != UCC('_'))) {
+				if (uc_strncmp(fp, UCL("function"), 8) == 0 &&
+				    !uc_isalnum(fp[8])) {
+					ucchar *ns, *ne;
+					int nl;
+					fp += 8;
+					while (fp < row->chars + row->size &&
+					       *fp == UCC(' '))
+						fp++;
+					ns = fp;
+					while (fp < row->chars + row->size &&
+					       (uc_isalnum(*fp) || *fp == UCC('_')))
+						fp++;
+					ne = fp;
+					nl = (int)(ne - ns);
+					if (nl > 0) {
+						int idx = E.numFuncNames;
+						E.funcNames = realloc(E.funcNames,
+							sizeof(kwtype) * (idx + 2));
+						E.funcNames[idx] = malloc(
+							sizeof(ucchar) * (nl + 1));
+						uc_strncpy(E.funcNames[idx], ns, nl);
+						E.funcNames[idx][nl] = UCC('\0');
+						E.numFuncNames = idx + 1;
+						E.funcNames[idx + 1] = NULL;
+					}
+				}
+			}
+		}
+	}
+
 	for (p = row->chars, end = row->chars + row->size, i = 0;
 	     p < end; p++, i++) {
 
@@ -736,6 +793,14 @@ renderKeywords(erow *row, erow *prev)
 
 		/* Single-line comment: // */
 		if (*p == UCC('/') && (p + 1) < end && *(p+1) == UCC('/')) {
+			for (j = i; j < row->size; j++)
+				row->attr[j].color = COLOR_BRIGHT_CYAN;
+			row->hlState = HL_NONE;
+			return;
+		}
+
+		/* Single-line comment: -- (Lua, shell) */
+		if (*p == UCC('-') && (p + 1) < end && *(p+1) == UCC('-')) {
 			for (j = i; j < row->size; j++)
 				row->attr[j].color = COLOR_BRIGHT_CYAN;
 			row->hlState = HL_NONE;
@@ -768,19 +833,39 @@ renderKeywords(erow *row, erow *prev)
 				continue;
 			}
 			/* Try each keyword */
-			for (keyword = E.keywords; *keyword; keyword++) {
-				len = uc_strlen(*keyword);
-				if (uc_strncmp(p, *keyword, len) == 0) {
+			for (keyword = E.keywords; keyword->word; keyword++) {
+				len = uc_strlen(keyword->word);
+				if (uc_strncmp(p, keyword->word, len) == 0) {
 					ucchar *next = p + len;
 					if (next >= end ||
 					    (!uc_isalnum(*next) &&
 					     *next != UCC('_'))) {
 						for (j = 0; j < (int)len; j++)
 							row->attr[i + j].color =
-								COLOR_BRIGHT_GREEN;
+								keyword->color;
 						p += len - 1;
 						i += len - 1;
 						break;
+					}
+				}
+			}
+			/* Try user function names (if no keyword matched) */
+			if (!keyword->word && E.funcNames) {
+				int fi;
+				for (fi = 0; fi < E.numFuncNames; fi++) {
+					len = uc_strlen(E.funcNames[fi]);
+					if (uc_strncmp(p, E.funcNames[fi], len) == 0) {
+						ucchar *next = p + len;
+						if (next >= end ||
+						    (!uc_isalnum(*next) &&
+						     *next != UCC('_'))) {
+							for (j = 0; j < (int)len; j++)
+								row->attr[i + j].color =
+									COLOR_BLUE;
+							p += len - 1;
+							i += len - 1;
+							break;
+						}
 					}
 				}
 			}
@@ -1194,8 +1279,19 @@ editorOpen(const char *filename)
 	for (p = K; p->suffix; p++) {
 		if (!strcmp(p->suffix, suffix)) {
 			E.keywords = p->keywords;
+			E.lang = p->lang;
 			break;
 		}
+	}
+
+	/* Clear function name tracking for new file */
+	{
+		int fi;
+		for (fi = 0; fi < E.numFuncNames; fi++)
+			free(E.funcNames[fi]);
+		free(E.funcNames);
+		E.funcNames = NULL;
+		E.numFuncNames = 0;
 	}
 
 	fp = fopen(filename, "r");
@@ -2880,7 +2976,7 @@ initEditor(void)
 	E.posStack	= malloc(sizeof(int) * C.positionStackSize);
 	E.posTop	= 0;
 
-	E.colorDepth	= 16;
+	E.colorDepth	= 256;
 
 	updateWindowSize();
 	signal(SIGWINCH, handleSigWinCh);
@@ -2895,7 +2991,7 @@ usage(const char *prog)
 	fprintf(stderr, "  --help         Show this help message\n");
 	fprintf(stderr, "  --version      Show version information\n");
 	fprintf(stderr, "  --no-color     Disable syntax highlighting\n");
-	fprintf(stderr, "  --colors=N     Color depth: 8, 16, or 256 (default: 16)\n");
+	fprintf(stderr, "  --colors=N     Color depth: 8, 16, or 256 (default: 256)\n");
 	fprintf(stderr, "  --read-only    Open file in read-only mode\n");
 	fprintf(stderr, "  -R             Same as --read-only\n");
 	fprintf(stderr, "  -              Read from standard input\n");
@@ -2965,6 +3061,7 @@ main(int argc, const char *argv[])
 	}
 
 	setlocale(LC_ALL, "");
+	initKeywords();
 	initEditor();
 
 	if (i < argc)

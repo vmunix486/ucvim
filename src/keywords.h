@@ -3,24 +3,25 @@
  *	This file is in the public domain.
  */
 
-kwtype __cKeywords[] = {
-	/* Types */
+/* Language IDs for lang-specific highlighting rules */
+#define L_DEFAULT 0
+#define L_LUA 1
+
+/* Default keyword color for most languages */
+#define KC COLOR_BRIGHT_GREEN
+
+kwtype __cKeywordsRaw[] = {
 	UCL("int"), UCL("long"), UCL("short"), UCL("char"), UCL("void"),
 	UCL("float"), UCL("double"), UCL("unsigned"), UCL("signed"),
 	UCL("bool"), UCL("_Bool"), UCL("size_t"), UCL("ssize_t"),
 	UCL("wchar_t"), UCL("FILE"), UCL("NULL"),
-	/* Modifiers */
 	UCL("const"), UCL("volatile"), UCL("static"), UCL("extern"),
 	UCL("auto"), UCL("register"), UCL("inline"), UCL("restrict"),
-	/* Control flow */
 	UCL("if"), UCL("else"), UCL("for"), UCL("while"), UCL("do"),
 	UCL("switch"), UCL("case"), UCL("default"), UCL("break"),
 	UCL("continue"), UCL("return"), UCL("goto"),
-	/* Structures */
 	UCL("struct"), UCL("union"), UCL("enum"), UCL("typedef"),
-	/* Operators */
 	UCL("sizeof"), UCL("typeof"), UCL("asm"),
-	/* Standard library */
 	UCL("printf"), UCL("fprintf"), UCL("sprintf"), UCL("snprintf"),
 	UCL("scanf"), UCL("fscanf"), UCL("sscanf"),
 	UCL("malloc"), UCL("calloc"), UCL("realloc"), UCL("free"),
@@ -38,55 +39,44 @@ kwtype __cKeywords[] = {
 	UCL("isalpha"), UCL("isdigit"), UCL("isalnum"), UCL("isspace"),
 	UCL("isupper"), UCL("islower"), UCL("toupper"), UCL("tolower"),
 	UCL("signal"), UCL("raise"),
-	/* Common macros */
 	UCL("true"), UCL("false"),
 	NULL
 };
+/* Auto-wrap raw kwtype array into Keyword array with default color */
+static Keyword __cKeywords[sizeof(__cKeywordsRaw)/sizeof(__cKeywordsRaw[0])];
 
-kwtype __luaKeywords[] = {
-	/* Keywords */
-	UCL("function"), UCL("local"), UCL("return"), UCL("if"),
+kwtype __luaKeywordsRaw[] = {
+	UCL("local"), UCL("return"), UCL("if"),
 	UCL("then"), UCL("else"), UCL("elseif"), UCL("end"),
 	UCL("for"), UCL("in"), UCL("do"), UCL("while"), UCL("repeat"),
 	UCL("until"), UCL("break"), UCL("goto"),
-	/* Values */
-	UCL("true"), UCL("false"), UCL("nil"),
-	/* Operators */
-	UCL("and"), UCL("or"), UCL("not"),
-	/* Standard library */
+	UCL("and"), UCL("or"), UCL("not"), UCL("nil"),
 	UCL("print"), UCL("error"), UCL("assert"), UCL("pcall"),
 	UCL("xpcall"), UCL("require"), UCL("dofile"), UCL("loadfile"),
 	UCL("type"), UCL("tostring"), UCL("tonumber"), UCL("pairs"),
 	UCL("ipairs"), UCL("next"), UCL("select"), UCL("unpack"),
 	UCL("rawget"), UCL("rawset"), UCL("setmetatable"), UCL("getmetatable"),
-	/* String library */
 	UCL("string"), UCL("byte"), UCL("char"), UCL("find"),
 	UCL("format"), UCL("gmatch"), UCL("gsub"), UCL("len"),
 	UCL("lower"), UCL("match"), UCL("rep"), UCL("reverse"),
 	UCL("sub"), UCL("upper"),
-	/* Math library */
 	UCL("math"), UCL("abs"), UCL("ceil"), UCL("floor"),
 	UCL("max"), UCL("min"), UCL("sqrt"), UCL("sin"), UCL("cos"),
 	UCL("tan"), UCL("exp"), UCL("log"), UCL("pi"),
-	/* IO library */
 	UCL("io"), UCL("open"), UCL("close"), UCL("read"),
 	UCL("write"), UCL("lines"),
-	/* Table library */
 	UCL("table"), UCL("insert"), UCL("remove"), UCL("sort"), UCL("concat"),
-	/* OS library */
 	UCL("os"), UCL("execute"), UCL("exit"), UCL("clock"), UCL("date"),
-	/* Coroutine library */
 	UCL("coroutine"), UCL("create"), UCL("resume"), UCL("yield"), UCL("wrap"),
 	NULL
 };
+static Keyword __luaKeywords[sizeof(__luaKeywordsRaw)/sizeof(__luaKeywordsRaw[0])];
 
-kwtype __shellKeywords[] = {
-	/* Control flow */
+kwtype __shellKeywordsRaw[] = {
 	UCL("if"), UCL("then"), UCL("else"), UCL("elif"), UCL("fi"),
 	UCL("for"), UCL("do"), UCL("done"), UCL("while"), UCL("until"),
 	UCL("case"), UCL("esac"), UCL("in"), UCL("break"), UCL("continue"),
 	UCL("return"), UCL("exit"), UCL("test"),
-	/* Common commands */
 	UCL("echo"), UCL("printf"), UCL("read"), UCL("cd"), UCL("pwd"),
 	UCL("ls"), UCL("cat"), UCL("cp"), UCL("mv"), UCL("rm"),
 	UCL("mkdir"), UCL("rmdir"), UCL("chmod"), UCL("chown"),
@@ -94,7 +84,6 @@ kwtype __shellKeywords[] = {
 	UCL("uniq"), UCL("wc"), UCL("head"), UCL("tail"),
 	UCL("tr"), UCL("cut"), UCL("paste"), UCL("join"),
 	UCL("tar"), UCL("gzip"), UCL("gunzip"), UCL("bzip2"),
-	UCL("chmod"), UCL("chown"), UCL("chgrp"),
 	UCL("ps"), UCL("kill"), UCL("killall"), UCL("bg"), UCL("fg"),
 	UCL("jobs"), UCL("wait"), UCL("sleep"),
 	UCL("touch"), UCL("ln"), UCL("stat"), UCL("file"),
@@ -103,68 +92,54 @@ kwtype __shellKeywords[] = {
 	UCL("env"), UCL("export"), UCL("set"), UCL("unset"),
 	UCL("source"), UCL("alias"), UCL("unalias"),
 	UCL("true"), UCL("false"), UCL("yes"),
-	/* Variables */
 	UCL("PATH"), UCL("HOME"), UCL("USER"), UCL("SHELL"),
 	UCL("PWD"), UCL("OLDPWD"), UCL("TMPDIR"),
 	UCL("LANG"), UCL("LC_ALL"), UCL("TERM"),
-	/* Shell special variables */
-	UCL("$?"), UCL("$#"), UCL("$$"), UCL("$!"), UCL("$@"),
 	NULL
 };
+static Keyword __shellKeywords[sizeof(__shellKeywordsRaw)/sizeof(__shellKeywordsRaw[0])];
 
-kwtype __cppKeywords[] = {
-	/* Types */
+kwtype __cppKeywordsRaw[] = {
 	UCL("int"), UCL("long"), UCL("short"), UCL("char"), UCL("void"),
 	UCL("float"), UCL("double"), UCL("unsigned"), UCL("signed"),
 	UCL("bool"), UCL("auto"), UCL("wchar_t"), UCL("string"),
 	UCL("size_t"), UCL("nullptr"), UCL("NULL"),
-	/* Modifiers */
 	UCL("const"), UCL("volatile"), UCL("static"), UCL("extern"),
 	UCL("inline"), UCL("virtual"), UCL("override"), UCL("final"),
 	UCL("explicit"), UCL("mutable"), UCL("constexpr"),
-	/* Control flow */
 	UCL("if"), UCL("else"), UCL("for"), UCL("while"), UCL("do"),
 	UCL("switch"), UCL("case"), UCL("default"), UCL("break"),
-	UCL("continue"), UCL("return"), UCL("goto"), UCL("co_return"),
-	UCL("co_await"), UCL("co_yield"),
-	/* Structures */
+	UCL("continue"), UCL("return"), UCL("goto"),
 	UCL("struct"), UCL("class"), UCL("union"), UCL("enum"),
 	UCL("typedef"), UCL("typename"), UCL("namespace"),
 	UCL("using"), UCL("template"),
-	/* OOP */
 	UCL("new"), UCL("delete"), UCL("this"), UCL("operator"),
 	UCL("friend"), UCL("public"), UCL("private"), UCL("protected"),
-	/* Exceptions */
 	UCL("try"), UCL("catch"), UCL("throw"), UCL("noexcept"),
-	UCL("throws"),
-	/* Concepts */
 	UCL("concept"), UCL("requires"),
-	/* Values */
 	UCL("true"), UCL("false"),
-	/* STL containers */
 	UCL("vector"), UCL("list"), UCL("map"), UCL("set"),
 	UCL("unordered_map"), UCL("unordered_set"),
 	UCL("deque"), UCL("queue"), UCL("stack"), UCL("array"),
-	/* Smart pointers */
 	UCL("unique_ptr"), UCL("shared_ptr"), UCL("weak_ptr"),
-	/* Streams */
 	UCL("cin"), UCL("cout"), UCL("cerr"), UCL("endl"),
 	UCL("ifstream"), UCL("ofstream"), UCL("fstream"),
-	/* Standard library */
 	UCL("std"), UCL("move"), UCL("forward"), UCL("swap"),
 	UCL("make_pair"), UCL("make_tuple"),
 	NULL
 };
+static Keyword __cppKeywords[sizeof(__cppKeywordsRaw)/sizeof(__cppKeywordsRaw[0])];
 
-kwtype __rclangKeywords[] = {
+kwtype __rclangKeywordsRaw[] = {
 	UCL("val"), UCL("sal"), UCL("s8"), UCL("u8"), UCL("s16"), UCL("u16"),
 	UCL("s32"), UCL("u32"), UCL("s64"), UCL("u64"), UCL("for"), UCL("fn"),
 	UCL("if"), UCL("else"), UCL("dcl"), UCL("ret"), UCL("break"),
 	UCL("export"), UCL("szo"), UCL("ptr"),
 	NULL
 };
+static Keyword __rclangKeywords[sizeof(__rclangKeywordsRaw)/sizeof(__rclangKeywordsRaw[0])];
 
-kwtype __golangKeywords[] = {
+kwtype __golangKeywordsRaw[] = {
 	UCL("go"), UCL("func"), UCL("int"), UCL("uint"), UCL("byte"),
 	UCL("int8"), UCL("int16"), UCL("int32"), UCL("int64"), UCL("uint8"),
 	UCL("uint16"), UCL("uint32"), UCL("uint64"), UCL("string"), UCL("map"),
@@ -178,35 +153,34 @@ kwtype __golangKeywords[] = {
 	UCL("panic"), UCL("recover"), UCL("new"), UCL("print"), UCL("println"),
 	NULL
 };
+static Keyword __golangKeywords[sizeof(__golangKeywordsRaw)/sizeof(__golangKeywordsRaw[0])];
 
-kwtype __elmKeywords[] = {
+kwtype __elmKeywordsRaw[] = {
 	UCL("module"), UCL("Cmd"), UCL("Sub"), UCL("List"), UCL("type"),
-	UCL("alias"), UCL("case"), UCL("of"), UCL("import"), UCL("module"),
+	UCL("alias"), UCL("case"), UCL("of"), UCL("import"),
 	UCL("exposing"), UCL("as"), UCL("String"), UCL("Int"), UCL("if"),
 	UCL("then"), UCL("else"), UCL("Maybe"), UCL("Result"), UCL("Just"),
 	UCL("Nothing"), UCL("True"), UCL("False"), UCL("Err"), UCL("Ok"),
 	UCL("Bool"),
 	NULL
 };
+static Keyword __elmKeywords[sizeof(__elmKeywordsRaw)/sizeof(__elmKeywordsRaw[0])];
 
-kwtype __haskellKeywords[] = {
+kwtype __haskellKeywordsRaw[] = {
 	UCL("module"), UCL("where"), UCL("let"), UCL("in"), UCL("import"),
 	UCL("hiding"), UCL("qualified"), UCL("instance"), UCL("class"),
 	UCL("case"), UCL("of"), UCL("if"), UCL("then"), UCL("else"), UCL("do"),
 	UCL("type"), UCL("data"), UCL("newtype"),
-
-	UCL("Applicative"), UCL("Bool"), UCL("Bounded"), UCL("Char"),
-	UCL("Double"), UCL("Eq"), UCL("Either"), UCL("Enum"), UCL("Float"),
-	UCL("Floating"), UCL("Foldable"), UCL("Fractional"), UCL("Functor"),
-	UCL("IO"), UCL("Int"), UCL("Integer"), UCL("Integral"), UCL("Just"),
-	UCL("Maybe"), UCL("Monad"), UCL("Num"), UCL("Ord"), UCL("Rational"),
-	UCL("Read"), UCL("ReadS"), UCL("Real"), UCL("ReadFloat"),
-	UCL("RealFrac"), UCL("Semigroup"), UCL("Show"), UCL("ShowS"),
-	UCL("String"), UCL("Traversable"), UCL("Word"),
+	UCL("Bool"), UCL("Char"), UCL("Double"), UCL("Either"), UCL("Enum"),
+	UCL("Float"), UCL("IO"), UCL("Int"), UCL("Integer"),
+	UCL("Just"), UCL("Maybe"), UCL("Num"), UCL("Ord"),
+	UCL("Read"), UCL("Real"), UCL("Semigroup"), UCL("Show"),
+	UCL("String"), UCL("Word"),
 	NULL
 };
+static Keyword __haskellKeywords[sizeof(__haskellKeywordsRaw)/sizeof(__haskellKeywordsRaw[0])];
 
-kwtype __m4Keywords[] = {
+kwtype __m4KeywordsRaw[] = {
 	UCL("dnl"), UCL("define"), UCL("defn"), UCL("indir"), UCL("pushdef"),
 	UCL("popdef"), UCL("builtin"), UCL("ifdef"), UCL("ifelse"), UCL("shift"),
 	UCL("include"), UCL("dumpdef"), UCL("traceon"), UCL("traceoff"),
@@ -218,9 +192,9 @@ kwtype __m4Keywords[] = {
 	UCL("mkstemp"), UCL("maketemp"), UCL("errprint"), UCL("m4exit"),
 	NULL
 };
+static Keyword __m4Keywords[sizeof(__m4KeywordsRaw)/sizeof(__m4KeywordsRaw[0])];
 
-kwtype __htmlKeywords[] = {
-	/* HTML tags */
+kwtype __htmlKeywordsRaw[] = {
 	UCL("html"), UCL("head"), UCL("body"), UCL("title"), UCL("meta"),
 	UCL("link"), UCL("script"), UCL("style"), UCL("div"), UCL("span"),
 	UCL("p"), UCL("br"), UCL("hr"), UCL("img"), UCL("a"),
@@ -235,7 +209,6 @@ kwtype __htmlKeywords[] = {
 	UCL("pre"), UCL("code"), UCL("blockquote"),
 	UCL("video"), UCL("audio"), UCL("source"), UCL("canvas"),
 	UCL("svg"), UCL("iframe"),
-	/* Common attributes */
 	UCL("class"), UCL("id"), UCL("href"), UCL("src"),
 	UCL("alt"), UCL("title"), UCL("type"), UCL("name"),
 	UCL("value"), UCL("placeholder"), UCL("disabled"),
@@ -243,37 +216,207 @@ kwtype __htmlKeywords[] = {
 	UCL("style"), UCL("onclick"), UCL("onload"),
 	NULL
 };
+static Keyword __htmlKeywords[sizeof(__htmlKeywordsRaw)/sizeof(__htmlKeywordsRaw[0])];
 
-kwtype __markdownKeywords[] = {
-	/* HTML entities/names that commonly appear */
+kwtype __markdownKeywordsRaw[] = {
 	UCL("nbsp"), UCL("amp"), UCL("lt"), UCL("gt"),
 	NULL
 };
+static Keyword __markdownKeywords[sizeof(__markdownKeywordsRaw)/sizeof(__markdownKeywordsRaw[0])];
 
 /*
- *	K[] must be defined as an array, which contains (char*, kwtype*) pairs,
- *	representing the suffix of a type of file and keywords used in the
- *	type of file.
+ *	Per-keyword color tables for Lua.
  */
+Keyword __luaKW[] = {
+	/* Control flow - bright green */
+	KW("local", COLOR_BRIGHT_GREEN),
+	KW("function", COLOR_BRIGHT_GREEN),
+	KW("return", COLOR_BRIGHT_GREEN),
+	KW("if", COLOR_BRIGHT_GREEN),
+	KW("then", COLOR_BRIGHT_GREEN),
+	KW("else", COLOR_BRIGHT_GREEN),
+	KW("elseif", COLOR_BRIGHT_GREEN),
+	KW("end", COLOR_BRIGHT_GREEN),
+	KW("for", COLOR_BRIGHT_GREEN),
+	KW("in", COLOR_BRIGHT_GREEN),
+	KW("do", COLOR_BRIGHT_GREEN),
+	KW("while", COLOR_BRIGHT_GREEN),
+	KW("repeat", COLOR_BRIGHT_GREEN),
+	KW("until", COLOR_BRIGHT_GREEN),
+	KW("break", COLOR_BRIGHT_GREEN),
+	KW("goto", COLOR_BRIGHT_GREEN),
+	/* Values */
+	KW("true", COLOR_GREEN),
+	KW("false", COLOR_RED),
+	KW("nil", COLOR_RED),
+	/* Operators */
+	KW("and", COLOR_BRIGHT_GREEN),
+	KW("or", COLOR_BRIGHT_GREEN),
+	KW("not", COLOR_BRIGHT_GREEN),
+	/* Standard library - cyan */
+	KW("print", COLOR_CYAN),
+	KW("error", COLOR_CYAN),
+	KW("assert", COLOR_CYAN),
+	KW("pcall", COLOR_CYAN),
+	KW("xpcall", COLOR_CYAN),
+	KW("require", COLOR_CYAN),
+	KW("dofile", COLOR_CYAN),
+	KW("loadfile", COLOR_CYAN),
+	KW("type", COLOR_CYAN),
+	KW("tostring", COLOR_CYAN),
+	KW("tonumber", COLOR_CYAN),
+	KW("pairs", COLOR_CYAN),
+	KW("ipairs", COLOR_CYAN),
+	KW("next", COLOR_CYAN),
+	KW("select", COLOR_CYAN),
+	KW("unpack", COLOR_CYAN),
+	KW("rawget", COLOR_CYAN),
+	KW("rawset", COLOR_CYAN),
+	KW("setmetatable", COLOR_CYAN),
+	KW("getmetatable", COLOR_CYAN),
+	KW("string", COLOR_CYAN),
+	KW("byte", COLOR_CYAN),
+	KW("char", COLOR_CYAN),
+	KW("find", COLOR_CYAN),
+	KW("format", COLOR_CYAN),
+	KW("gmatch", COLOR_CYAN),
+	KW("gsub", COLOR_CYAN),
+	KW("len", COLOR_CYAN),
+	KW("lower", COLOR_CYAN),
+	KW("match", COLOR_CYAN),
+	KW("rep", COLOR_CYAN),
+	KW("reverse", COLOR_CYAN),
+	KW("sub", COLOR_CYAN),
+	KW("upper", COLOR_CYAN),
+	KW("math", COLOR_CYAN),
+	KW("abs", COLOR_CYAN),
+	KW("ceil", COLOR_CYAN),
+	KW("floor", COLOR_CYAN),
+	KW("max", COLOR_CYAN),
+	KW("min", COLOR_CYAN),
+	KW("sqrt", COLOR_CYAN),
+	KW("sin", COLOR_CYAN),
+	KW("cos", COLOR_CYAN),
+	KW("tan", COLOR_CYAN),
+	KW("exp", COLOR_CYAN),
+	KW("log", COLOR_CYAN),
+	KW("pi", COLOR_CYAN),
+	KW("io", COLOR_CYAN),
+	KW("open", COLOR_CYAN),
+	KW("close", COLOR_CYAN),
+	KW("read", COLOR_CYAN),
+	KW("write", COLOR_CYAN),
+	KW("lines", COLOR_CYAN),
+	KW("table", COLOR_CYAN),
+	KW("insert", COLOR_CYAN),
+	KW("remove", COLOR_CYAN),
+	KW("sort", COLOR_CYAN),
+	KW("concat", COLOR_CYAN),
+	KW("os", COLOR_CYAN),
+	KW("execute", COLOR_CYAN),
+	KW("exit", COLOR_CYAN),
+	KW("clock", COLOR_CYAN),
+	KW("date", COLOR_CYAN),
+	KW("coroutine", COLOR_CYAN),
+	KW("create", COLOR_CYAN),
+	KW("resume", COLOR_CYAN),
+	KW("yield", COLOR_CYAN),
+	KW("wrap", COLOR_CYAN),
+	KW_END
+};
 
 Keyword_Class K[] = {
-	{ ".c", __cKeywords },
-	{ ".h", __cKeywords },
-	{ ".lua", __luaKeywords },
-	{ ".sh", __shellKeywords },
-	{ ".cc", __cppKeywords },
-	{ ".cpp", __cppKeywords },
-	{ ".hpp", __cppKeywords },
-	{ ".cxx", __cppKeywords },
-	{ ".rcs", __rclangKeywords },
-	{ ".go", __golangKeywords },
-	{ ".elm", __elmKeywords },
-	{ ".hs", __haskellKeywords },
-	{ ".m4", __m4Keywords },
-	{ ".ac", __m4Keywords },
-	{ ".html", __htmlKeywords },
-	{ ".htm", __htmlKeywords },
-	{ ".md", __markdownKeywords },
-	{ ".markdown", __markdownKeywords },
-	{ NULL, NULL },
+	{ ".c", L_DEFAULT, __cKeywords },
+	{ ".h", L_DEFAULT, __cKeywords },
+	{ ".lua", L_LUA, __luaKW },
+	{ ".sh", L_DEFAULT, __shellKeywords },
+	{ ".cc", L_DEFAULT, __cppKeywords },
+	{ ".cpp", L_DEFAULT, __cppKeywords },
+	{ ".hpp", L_DEFAULT, __cppKeywords },
+	{ ".cxx", L_DEFAULT, __cppKeywords },
+	{ ".rcs", L_DEFAULT, __rclangKeywords },
+	{ ".go", L_DEFAULT, __golangKeywords },
+	{ ".elm", L_DEFAULT, __elmKeywords },
+	{ ".hs", L_DEFAULT, __haskellKeywords },
+	{ ".m4", L_DEFAULT, __m4Keywords },
+	{ ".ac", L_DEFAULT, __m4Keywords },
+	{ ".html", L_DEFAULT, __htmlKeywords },
+	{ ".htm", L_DEFAULT, __htmlKeywords },
+	{ ".md", L_DEFAULT, __markdownKeywords },
+	{ ".markdown", L_DEFAULT, __markdownKeywords },
+	{ NULL, 0, NULL },
 };
+
+/*
+ *	Initialize the auto-wrapped Keyword arrays from raw kwtype arrays.
+ *	Called once at startup.
+ */
+static void initKeywords(void)
+{
+	int i;
+	for (i = 0; __cKeywordsRaw[i]; i++) {
+		__cKeywords[i].word = __cKeywordsRaw[i];
+		__cKeywords[i].color = KC;
+	}
+	__cKeywords[i].word = NULL; __cKeywords[i].color = 0;
+
+	for (i = 0; __luaKeywordsRaw[i]; i++) {
+		__luaKeywords[i].word = __luaKeywordsRaw[i];
+		__luaKeywords[i].color = KC;
+	}
+	__luaKeywords[i].word = NULL; __luaKeywords[i].color = 0;
+
+	for (i = 0; __shellKeywordsRaw[i]; i++) {
+		__shellKeywords[i].word = __shellKeywordsRaw[i];
+		__shellKeywords[i].color = KC;
+	}
+	__shellKeywords[i].word = NULL; __shellKeywords[i].color = 0;
+
+	for (i = 0; __cppKeywordsRaw[i]; i++) {
+		__cppKeywords[i].word = __cppKeywordsRaw[i];
+		__cppKeywords[i].color = KC;
+	}
+	__cppKeywords[i].word = NULL; __cppKeywords[i].color = 0;
+
+	for (i = 0; __rclangKeywordsRaw[i]; i++) {
+		__rclangKeywords[i].word = __rclangKeywordsRaw[i];
+		__rclangKeywords[i].color = KC;
+	}
+	__rclangKeywords[i].word = NULL; __rclangKeywords[i].color = 0;
+
+	for (i = 0; __golangKeywordsRaw[i]; i++) {
+		__golangKeywords[i].word = __golangKeywordsRaw[i];
+		__golangKeywords[i].color = KC;
+	}
+	__golangKeywords[i].word = NULL; __golangKeywords[i].color = 0;
+
+	for (i = 0; __elmKeywordsRaw[i]; i++) {
+		__elmKeywords[i].word = __elmKeywordsRaw[i];
+		__elmKeywords[i].color = KC;
+	}
+	__elmKeywords[i].word = NULL; __elmKeywords[i].color = 0;
+
+	for (i = 0; __haskellKeywordsRaw[i]; i++) {
+		__haskellKeywords[i].word = __haskellKeywordsRaw[i];
+		__haskellKeywords[i].color = KC;
+	}
+	__haskellKeywords[i].word = NULL; __haskellKeywords[i].color = 0;
+
+	for (i = 0; __m4KeywordsRaw[i]; i++) {
+		__m4Keywords[i].word = __m4KeywordsRaw[i];
+		__m4Keywords[i].color = KC;
+	}
+	__m4Keywords[i].word = NULL; __m4Keywords[i].color = 0;
+
+	for (i = 0; __htmlKeywordsRaw[i]; i++) {
+		__htmlKeywords[i].word = __htmlKeywordsRaw[i];
+		__htmlKeywords[i].color = KC;
+	}
+	__htmlKeywords[i].word = NULL; __htmlKeywords[i].color = 0;
+
+	for (i = 0; __markdownKeywordsRaw[i]; i++) {
+		__markdownKeywords[i].word = __markdownKeywordsRaw[i];
+		__markdownKeywords[i].color = KC;
+	}
+	__markdownKeywords[i].word = NULL; __markdownKeywords[i].color = 0;
+}

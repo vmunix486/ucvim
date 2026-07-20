@@ -203,6 +203,7 @@ typedef enum {
 /* This structure represents a single line of the file we are editing. */
 typedef struct {
 	int size;		/* Size of the row, excluding the null term. */
+	int csize;		/* Allocated capacity of chars buffer. */
 	ucchar *chars;		/* Row content. */
 	int asize;		/* Size of attr */
 	Char_Attr *attr;	/* Character attributes */
@@ -299,6 +300,7 @@ enum KEY_ACTION {
 	ARROW_UP,
 	ARROW_DOWN,
 	DEL_KEY,
+	CTRL_DEL_KEY,
 	HOME_KEY,
 	END_KEY,
 	PAGE_UP,
@@ -467,17 +469,19 @@ editorReadKey(int fd) {
 						case '5': return PAGE_UP;
 						case '6': return PAGE_DOWN;
 						}
-					} else if (seq[2] == ';') {
-						/* Ctrl+Arrow: ESC [ 1 ; 5 C/D */
-						char extra[2];
-						if (read(STDIN_FILENO, extra, 1) <= 0) return ESC;
-						if (read(STDIN_FILENO, extra+1, 1) <= 0) return ESC;
-						if (extra[0] == '5') {
-							if (extra[1] == 'C')
-								return CTRL_ARROW_RIGHT;
-							if (extra[1] == 'D')
-								return CTRL_ARROW_LEFT;
-						}
+				} else if (seq[2] == ';') {
+					/* Ctrl+Arrow/Del: ESC [ 1/3 ; 5 C/D/~ */
+					char extra[2];
+					if (read(STDIN_FILENO, extra, 1) <= 0) return ESC;
+					if (read(STDIN_FILENO, extra+1, 1) <= 0) return ESC;
+					if (extra[0] == '5') {
+						if (extra[1] == 'C')
+							return CTRL_ARROW_RIGHT;
+						if (extra[1] == 'D')
+							return CTRL_ARROW_LEFT;
+						if (extra[1] == '~')
+							return CTRL_DEL_KEY;
+					}
 					}
 					/* Consume any trailing bytes of unknown
 					 * extended sequences to avoid blocking. */
@@ -1466,6 +1470,7 @@ editorInsertRow(int at, const ucchar *s, size_t len)
 			sizeof(E.row[0]) * (E.numrows - at));
 
 	E.row[at].size	= len;
+	E.row[at].csize	= len + 1;
 	E.row[at].attr	= NULL;
 	E.row[at].asize	= 0;
 	E.row[at].chars	= malloc(sizeof(ucchar) * (len + 1));
@@ -1573,14 +1578,19 @@ editorRowInsertChar(erow *row, int at, int c)
 {
 	int padlen;
 	int i;
+	int needed;
 
 	if (at > row->size) {
 /* Pad the string with spaces if the insert location is outside the
  * current length by more than a single character. */
 	        padlen = at - row->size;
 /* In the next line +2 means: new char and null term. */
-		row->chars = realloc(row->chars, sizeof(ucchar) *
-						 (row->size + padlen + 2));
+		needed = row->size + padlen + 2;
+		if (row->csize < needed) {
+			row->csize = needed + needed / 2;
+			row->chars = realloc(row->chars, sizeof(ucchar) *
+							 row->csize);
+		}
 		for (i = 0; i < padlen; i++)
 			row->chars[row->size + i] = UCC(' ');
 		row->chars[row->size + padlen + 1] = UCC('\0');
@@ -1588,8 +1598,12 @@ editorRowInsertChar(erow *row, int at, int c)
 	} else {
         /* If we are in the middle of the string just make space for 1 new
          * char plus the (already existing) null term. */
-		row->chars = realloc(row->chars, sizeof(ucchar) *
-						 (row->size + 2));
+		needed = row->size + 2;
+		if (row->csize < needed) {
+			row->csize = needed + needed / 2;
+			row->chars = realloc(row->chars, sizeof(ucchar) *
+							 row->csize);
+		}
 		memmove(row->chars + at + 1, row->chars + at,
 			sizeof(ucchar) * (row->size - at + 1));
 		row->size++;
@@ -1603,8 +1617,11 @@ editorRowInsertChar(erow *row, int at, int c)
 void
 editorRowAppendString(erow *row, ucchar *s, size_t len)
 {
-	row->chars = realloc(row->chars, sizeof(ucchar) *
-					 (row->size + len + 1));
+	int needed = row->size + len + 1;
+	if (row->csize < needed) {
+		row->csize = needed + needed / 2;
+		row->chars = realloc(row->chars, sizeof(ucchar) * row->csize);
+	}
 	uc_strncat(row->chars, s, len);
 	row->size += len;
 	editorUpdateRow(row);
@@ -1756,33 +1773,85 @@ editorCopyRange(int sx, int sy, int ex, int ey)
 	int size = 1;				/* '\0' */
 	int i;
 	ucchar *copy;
+	ucchar *p;
 
 	for (i = sy; i <= ey; i++)
 		size += E.row[i].size + 1;	/* '\n' */
 
 	copy = malloc(sizeof(ucchar) * size);
 	assert(copy);
-	copy[0] = UCC('\0');
+	p = copy;
 
 	for (i = sy; i <= ey; i++) {
-		if (E.row[i].chars)
-			uc_strncat(copy, E.row[i].chars + (i == sy ? sx : 0),
-				i == ey ? (ex + 1 - (i == sy ? sx : 0)) :
-					  E.row[i].size);
-		uc_strcat(copy, UCL("\n"));
+		int start = (i == sy) ? sx : 0;
+		int len = i == ey ? (ex + 1 - start) : E.row[i].size;
+		if (E.row[i].chars && len > 0) {
+			uc_strncpy(p, E.row[i].chars + start, len);
+			p += len;
+		}
+		*p++ = UCC('\n');
 	}
+	*p = UCC('\0');
 	return copy;
 }
 
 void
 editorPaste(ucchar *s)
 {
-	int i;
-	for (i = 0; s[i]; i++) {
-		if (s[i] == UCC('\n')) {
-			editorInsertNewline();
-		} else {
-			editorInsertChar(s[i]);
+	int i, lineStart;
+	int filerow = E.rowoff + E.cy;
+	erow *row;
+	int firstLine = 1;
+
+	if (!s || !s[0])
+		return;
+
+	/* Ensure current row exists */
+	while (E.numrows <= filerow)
+		editorInsertRow(E.numrows, UCL(""), 0);
+
+	lineStart = 0;
+	for (i = 0; ; i++) {
+		if (s[i] == UCC('\n') || s[i] == UCC('\0')) {
+			int len = i - lineStart;
+
+			if (firstLine && len > 0) {
+				int j;
+				for (j = 0; j < len; j++)
+					editorInsertChar(s[lineStart + j]);
+			} else if (len > 0) {
+				editorInsertRow(filerow + 1, s + lineStart, len);
+				filerow++;
+			}
+
+			if (s[i] == UCC('\0'))
+				break;
+
+			if (firstLine) {
+				row = &E.row[filerow];
+				if (E.cx < row->size) {
+					editorInsertRow(filerow + 1,
+						row->chars + E.cx,
+						row->size - E.cx);
+					row = &E.row[filerow];
+					row->size = E.cx;
+					row->chars[row->size] = UCC('\0');
+					editorUpdateRow(row);
+				} else {
+					editorInsertRow(filerow + 1, UCL(""), 0);
+				}
+				filerow++;
+				firstLine = 0;
+			} else {
+				editorInsertRow(filerow + 1, UCL(""), 0);
+				filerow++;
+			}
+			E.cx = 0;
+			if (E.cy == E.rowBottom && E.isScreenFull)
+				E.rowoff++;
+			else
+				E.cy++;
+			lineStart = i + 1;
 		}
 	}
 }
@@ -2306,10 +2375,7 @@ editorRefreshScreen(int doWrite)
 			E.rowBottom = i;
 
 		if (doWrite) {
-			writeString("\x1b[0m");
-			writeString("\x1b[37m");
-			writeString("\x1b[0K");
-			writeString("\r\n");
+			writeString("\x1b[0m\x1b[37m\x1b[0K\r\n");
 		}
 	}
 
@@ -3096,6 +3162,101 @@ wordRight(void)
 		E.cx++;
 }
 
+static void
+delWordLeft(void)
+{
+	erow *row;
+	int filerow;
+	int startCx;
+
+	filerow = E.rowoff + E.cy;
+	row = &E.row[filerow];
+	startCx = E.cx;
+
+	if (E.cx == 0) {
+		/* Join with previous line */
+		if (filerow > 0) {
+			erow *prev = &E.row[filerow - 1];
+			int prevSize = prev->size;
+			if (prevSize > 0) {
+				E.cx = prevSize - 1;
+				editorRowAppendString(prev, row->chars, row->size);
+				editorDelRow(filerow);
+				E.cy--;
+				if (E.cy < 0) { E.rowoff--; E.cy = 0; }
+				editorUpdateRow(prev);
+			}
+		}
+		return;
+	}
+
+	/* Skip word chars to the left */
+	while (E.cx > 0 && isWordChar(row->chars[E.cx - 1]))
+		E.cx--;
+	/* Skip whitespace */
+	while (E.cx > 0 && uc_isspace(row->chars[E.cx - 1]))
+		E.cx--;
+	/* Skip non-word, non-space chars */
+	while (E.cx > 0 && !isWordChar(row->chars[E.cx - 1]) &&
+	       !uc_isspace(row->chars[E.cx - 1]))
+		E.cx--;
+
+	/* Delete from E.cx to startCx */
+	{
+		int delLen = startCx - E.cx;
+		memmove(row->chars + E.cx, row->chars + startCx,
+			(row->size - startCx + 1) * sizeof(ucchar));
+		row->size -= delLen;
+		editorUpdateRow(row);
+	}
+}
+
+static void
+delWordRight(void)
+{
+	erow *row;
+	int filerow;
+	int startCx;
+	int endCx;
+
+	filerow = E.rowoff + E.cy;
+	row = &E.row[filerow];
+	startCx = E.cx;
+
+	if (startCx >= row->size) {
+		/* At end of line: join with next line */
+		if (filerow < E.numrows - 1) {
+			erow *next = &E.row[filerow + 1];
+			editorRowAppendString(row, next->chars, next->size);
+			editorDelRow(filerow + 1);
+			editorUpdateRow(row);
+		}
+		return;
+	}
+
+	endCx = startCx;
+
+	/* Skip current word chars */
+	while (endCx < row->size && isWordChar(row->chars[endCx]))
+		endCx++;
+	/* Skip whitespace */
+	while (endCx < row->size && uc_isspace(row->chars[endCx]))
+		endCx++;
+	/* Skip non-word, non-space chars */
+	while (endCx < row->size && !isWordChar(row->chars[endCx]) &&
+	       !uc_isspace(row->chars[endCx]))
+		endCx++;
+
+	/* Delete from startCx to endCx */
+	{
+		int delLen = endCx - startCx;
+		memmove(row->chars + startCx, row->chars + endCx,
+			(row->size - endCx + 1) * sizeof(ucchar));
+		row->size -= delLen;
+		editorUpdateRow(row);
+	}
+}
+
 char *
 getKeywordUnderCursor(void)
 {
@@ -3405,11 +3566,16 @@ processKeyInsert(int fd, int key)
 		editorStartChange(y + 1, y);
 		break;
 	case CTRL_BACKSPACE:
+		delWordLeft();
+		break;
 	case BACKSPACE:
 		editorDelChar();
 		break;
 	case DEL_KEY:
 		editorDelForwardChar();
+		break;
+	case CTRL_DEL_KEY:
+		delWordRight();
 		break;
 	case HOME_KEY:
 		E.cx = 0;
